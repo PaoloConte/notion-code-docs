@@ -6,7 +6,10 @@ from typing import Optional, Dict
 import yaml
 
 
-YAML_FILES = ["notion.config.yaml", "notion.config.yml"]
+YAML_FILES = [
+    "notion-docs.yaml",
+    "notion-docs.yml",
+]
 
 
 @dataclass
