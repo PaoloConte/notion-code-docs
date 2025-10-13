@@ -1,16 +1,17 @@
 import logging
 from typing import List, Optional, Tuple
-
 from notion_client import Client
 
 logger = logging.getLogger(__name__)
 
 
 from .markdown_to_notion import markdown_to_blocks
+from .mnemonic import compute_mnemonic
 
 class NotionClient:
     def __init__(self, api_key: str):
         self.client = Client(auth=api_key)
+
 
     def _markdown_to_blocks(self, md: str) -> List[dict]:
         """Delegate markdown conversion to the dedicated converter module."""
@@ -29,17 +30,26 @@ class NotionClient:
         logger.info("Found %d children under %s", len(results), parent_block_id)
         return results
 
-    def find_child_page(self, parent_page_id: str, title: str) -> Optional[str]:
+    def find_child_page(self, parent_page_id: str, segment: str) -> Optional[str]:
         # For a page parent, the child pages appear as child_page blocks under the page's block children
-        logger.info("Searching for child page '%s' under %s", title, parent_page_id)
+        # Matching uses both the page title and the computed mnemonic, in a single pass.
+        logger.info("Searching for child page matching segment '%s' under %s", segment, parent_page_id)
+        segment_upper = (segment or "").upper()
         for blk in self.list_children(parent_page_id):
             if blk.get("type") == "child_page":
                 child = blk.get("child_page", {})
-                if child.get("title") == title:
-                    page_id = blk.get("id")
-                    logger.info("Found child page '%s' with id %s", title, page_id)
+                title = child.get("title")
+                page_id = blk.get("id")
+                # Check exact title match first
+                if title == segment:
+                    logger.info("Found child page by title '%s' with id %s", title, page_id)
                     return page_id
-        logger.info("Child page '%s' not found under %s", title, parent_page_id)
+                # If not title, check computed mnemonic match
+                page_mn = compute_mnemonic(title or "")
+                if page_mn == segment_upper:
+                    logger.info("Found child page by computed mnemonic '%s' (title='%s') with id %s", page_mn, title, page_id)
+                    return page_id
+        logger.info("Child page for segment '%s' not found under %s", segment, parent_page_id)
         return None
 
     def create_child_page(self, parent_page_id: str, title: str) -> str:
