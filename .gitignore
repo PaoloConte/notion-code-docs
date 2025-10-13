@@ -39,3 +39,7 @@ ENV/
 # Misc
 .ropeproject/
 
+# Local config (do not commit)
+notion.config.yaml
+notion.config.yml
+

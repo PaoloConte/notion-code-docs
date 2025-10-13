@@ -12,6 +12,8 @@ YAML_FILES = ["notion.config.yaml", "notion.config.yml"]
 @dataclass
 class AppConfig:
     root: str
+    root_page_id: str
+    api_key: str
 
 
 def _load_yaml(path: str) -> Dict:
@@ -25,6 +27,7 @@ def load_config(path_or_dir: Optional[str] = None) -> AppConfig:
     If path_or_dir is a file, load that file. If it's a directory (or None),
     search for a known YAML config name in that directory.
     """
+    print(f"Loading config from {path_or_dir}")
     if path_or_dir:
         candidate = os.path.abspath(path_or_dir)
         if os.path.isdir(candidate):
@@ -57,6 +60,17 @@ def load_config(path_or_dir: Optional[str] = None) -> AppConfig:
     root = data.get("root")
     if not isinstance(root, str) or not root:
         raise ValueError("Config 'root' must be a non-empty string")
-    return AppConfig(root=root)
+    root_page_id_raw = data.get("root_page_id")
+    if root_page_id_raw is None:
+        raise ValueError("Config 'root_page_id' must be set")
+    root_page_id = str(root_page_id_raw).strip()
+    if not root_page_id:
+        raise ValueError("Config 'root_page_id' must be a non-empty string")
+
+    api_key = os.environ.get("NOTION_API_KEY")
+    if not api_key:
+        raise ValueError("Environment variable NOTION_API_KEY must be set")
+
+    return AppConfig(root=root, root_page_id=root_page_id, api_key=api_key)
 
 
