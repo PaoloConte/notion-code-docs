@@ -1,3 +1,4 @@
 pygments>=2.14,<3
 pytest>=7.0,<9
+PyYAML>=6.0,<7
 

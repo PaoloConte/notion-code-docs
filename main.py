@@ -1,14 +1,20 @@
 #!/usr/bin/env python3
 
 from typing import Optional, Sequence
+import argparse
 
-from notion_docs.cli import parse_args, run, print_results
+from notion_docs.cli import run, print_results, SUPPORTED_EXTENSIONS
+from notion_docs.config import load_config
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
-    args = parse_args(argv)
-    results = run(args.root, args.ext)
-    print_results(results, as_json=args.json)
+    parser = argparse.ArgumentParser(description="Extract NOTION.* comments using YAML config")
+    parser.add_argument("--config", "-c", default=".", help="Path to config file or directory (default: current directory)")
+    args = parser.parse_args(argv)
+
+    cfg = load_config(args.config)
+    results = run(cfg.root, SUPPORTED_EXTENSIONS)
+    print_results(results, as_json=True)
     return 0
 
 
