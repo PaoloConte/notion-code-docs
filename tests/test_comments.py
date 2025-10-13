@@ -28,8 +28,7 @@ fun main() {
 
 
 def test_extract_block_comments_from_text_normalization():
-    comments = extract_block_comments_from_text(SAMPLE_KOTLIN, lang="kotlin")
-    bodies = [c.text for c in comments]
+    bodies = extract_block_comments_from_text(SAMPLE_KOTLIN, lang="kotlin")
 
     assert len(bodies) == 5
     assert bodies[0] == "COMMENT 1"
@@ -49,5 +48,6 @@ def test_parse_breadcrumb_and_strip():
     for body, expected in cases:
         result = parse_breadcrumb_and_strip(body)
         assert result == expected
+
 
 

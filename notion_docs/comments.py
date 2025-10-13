@@ -5,7 +5,6 @@ from pygments import lex
 from pygments.lexers import JavaLexer, KotlinLexer
 from pygments.token import Token
 
-from .models import BlockComment
 
 
 def _normalize_block_comment_text(raw: str) -> str:
@@ -40,24 +39,16 @@ def _normalize_block_comment_text(raw: str) -> str:
     return "\n".join(lines)
 
 
-def extract_block_comments_from_text(text: str, lang: str) -> List[BlockComment]:
+def extract_block_comments_from_text(text: str, lang: str) -> List[str]:
     lexer = JavaLexer() if lang == "java" else KotlinLexer()
-    comments: List[BlockComment] = []
+    bodies: List[str] = []
     line = 1
     for tok_type, tok_val in lex(text, lexer):
         if tok_type in (Token.Comment.Multiline,):
-            start_line = line
-            end_line = line + tok_val.count("\n")
             body = _normalize_block_comment_text(tok_val)
-            comments.append(
-                BlockComment(
-                    file_path="",
-                    text=body,
-                    breadcrumb=[],
-                )
-            )
+            bodies.append(body)
         line += tok_val.count("\n")
-    return comments
+    return bodies
 
 
 def parse_breadcrumb_and_strip(body: str) -> Optional[Tuple[List[str], str]]:
