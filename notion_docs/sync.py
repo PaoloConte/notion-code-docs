@@ -106,7 +106,7 @@ def sync_to_notion(config: AppConfig, comments: List[BlockComment], dry_run: boo
             page_id = ensure_page(parent_id, crumb)
             ensured[crumb] = page_id
         state = pages[crumb]
-        # Update current page content/metadata if needed
+        # Update current page content first
         existing_text_hash, existing_subtree_hash = client.get_metadata(page_id)
         need_content = existing_text_hash != state.text_hash
         need_meta = (existing_text_hash != state.text_hash) or (existing_subtree_hash != state.subtree_hash)
@@ -115,18 +115,19 @@ def sync_to_notion(config: AppConfig, comments: List[BlockComment], dry_run: boo
             client.replace_page_content(page_id, state.text)
         else:
             logger.info("Content up-to-date for page '%s' (id=%s)", " / ".join(crumb), page_id)
+        # Traverse children only if subtree hash changed
+        if existing_subtree_hash != state.subtree_hash:
+            logger.info("Subtree changed for page '%s' (id=%s); processing subpages", " / ".join(crumb), page_id)
+            for child_crumb in children.get(crumb, []):
+                process_node(page_id, child_crumb)
+        else:
+            logger.info("Subtree unchanged for page '%s' (id=%s); skipping checks/ensures for subpages", " / ".join(crumb), page_id)
+        # After updating content and any subpages, update metadata if needed
         if need_meta:
-            logger.info("Updating metadata for page '%s' (id=%s)", " / ".join(crumb), page_id)
+            logger.info("Updating metadata for page '%s' (id=%s) after subtree update", " / ".join(crumb), page_id)
             client.set_metadata(page_id, state.text_hash, state.subtree_hash)
         else:
             logger.info("Metadata up-to-date for page '%s' (id=%s)", " / ".join(crumb), page_id)
-        # Prune subtree traversal if subtree hash unchanged
-        if existing_subtree_hash == state.subtree_hash:
-            logger.info("Subtree unchanged for page '%s' (id=%s); skipping checks/ensures for subpages", " / ".join(crumb), page_id)
-            return
-        # Otherwise, traverse direct children
-        for child_crumb in children.get(crumb, []):
-            process_node(page_id, child_crumb)
 
     # Start from top-level crumbs under the configured root
     for top in sorted(children.get(tuple(), [])):
