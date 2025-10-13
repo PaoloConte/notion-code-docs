@@ -1,5 +1,5 @@
 import logging
-from typing import List, Optional
+from typing import List, Optional, Any, Dict
 
 from markdown_it import MarkdownIt
 from markdown_it.token import Token
@@ -36,7 +36,7 @@ def markdown_to_blocks(md: str) -> List[dict]:
         def flush_buf():
             nonlocal buf, bold, italic, current_link
             if buf:
-                text_obj = {"content": "".join(buf)}
+                text_obj: Dict[str, Any] = {"content": "".join(buf)}
                 if current_link:
                     text_obj["link"] = {"url": current_link}
                 segments.append({
@@ -51,7 +51,7 @@ def markdown_to_blocks(md: str) -> List[dict]:
                 buf.append(t.content)
             elif t.type == "code_inline":
                 flush_buf()
-                text_obj = {"content": t.content}
+                text_obj: Dict[str, Any] = {"content": t.content}
                 if current_link:
                     text_obj["link"] = {"url": current_link}
                 segments.append({
