@@ -2,7 +2,7 @@ import re
 from typing import List, Optional, Tuple
 
 from pygments import lex
-from pygments.lexers import JavaLexer, KotlinLexer
+from pygments.lexers import JavaLexer, KotlinLexer, PhpLexer
 from pygments.token import Token
 
 
@@ -40,7 +40,15 @@ def _normalize_block_comment_text(raw: str) -> str:
 
 
 def extract_block_comments_from_text(text: str, lang: str) -> List[str]:
-    lexer = JavaLexer() if lang == "java" else KotlinLexer()
+    if lang == "java":
+        lexer = JavaLexer()
+    elif lang == "kotlin":
+        lexer = KotlinLexer()
+    elif lang == "php":
+        lexer = PhpLexer()
+    else:
+        # Default to Kotlin-style (C-style comments) if unknown
+        lexer = KotlinLexer()
     bodies: List[str] = []
     line = 1
     for tok_type, tok_val in lex(text, lexer):

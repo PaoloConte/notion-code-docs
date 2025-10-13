@@ -6,7 +6,7 @@ from .models import BlockComment
 from .comments import extract_block_comments_from_text, parse_breadcrumb_and_strip
 
 
-SUPPORTED_EXTENSIONS = {".java", ".kt", ".kts"}
+SUPPORTED_EXTENSIONS = {".java", ".kt", ".kts", ".php"}
 
 
 def iter_source_files(root: str) -> Iterator[str]:
@@ -21,6 +21,8 @@ def iter_source_files(root: str) -> Iterator[str]:
 def ext_to_lang(ext: str) -> str:
     if ext == ".java":
         return "java"
+    if ext == ".php":
+        return "php"
     return "kotlin"
 
 
