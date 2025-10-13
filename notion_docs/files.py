@@ -7,7 +7,7 @@ from .comments import extract_block_comments_from_text, parse_breadcrumb_and_str
 from .mnemonic import compute_mnemonic
 
 
-SUPPORTED_EXTENSIONS = {".java", ".kt", ".kts", ".php"}
+SUPPORTED_EXTENSIONS = {".java", ".kt", ".kts", ".php", ".md"}
 
 
 def iter_source_files(root: str) -> Iterator[str]:
@@ -24,6 +24,8 @@ def ext_to_lang(ext: str) -> str:
         return "java"
     if ext == ".php":
         return "php"
+    if ext == ".md":
+        return "markdown"
     return "kotlin"
 
 

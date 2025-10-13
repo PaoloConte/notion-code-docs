@@ -40,7 +40,9 @@ def _normalize_block_comment_text(raw: str) -> str:
 
 
 def extract_block_comments_from_text(text: str, lang: str) -> List[str]:
-    if lang == "java":
+    if lang == "markdown":
+        return [text.strip("\n")]
+    elif lang == "java":
         lexer = JavaLexer()
     elif lang == "kotlin":
         lexer = KotlinLexer()
