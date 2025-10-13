@@ -28,7 +28,7 @@ def _aggregate_comments(comments: List[BlockComment]) -> Dict[Tuple[str, ...], P
         lst.sort(key=lambda x: (x.file_path, x.text))
 
     combined_text: Dict[Tuple[str, ...], str] = {
-        crumb: "\n".join(c.text for c in lst) for crumb, lst in by_crumb.items()
+        crumb: "\n\n".join(c.text for c in lst) for crumb, lst in by_crumb.items()
     }
     combined_text_hash: Dict[Tuple[str, ...], str] = {
         crumb: hashlib.sha256(txt.encode("utf-8")).hexdigest()
