@@ -40,6 +40,6 @@ ENV/
 .ropeproject/
 
 # Local config (do not commit)
-notion.config.yaml
-notion.config.yml
+notion-docs.yaml
+notion-docs.yml
 
