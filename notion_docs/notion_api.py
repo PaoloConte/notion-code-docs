@@ -6,13 +6,14 @@ from notion_client import Client
 logger = logging.getLogger(__name__)
 
 
+from .markdown_to_notion import markdown_to_blocks
+
 class NotionClient:
     def __init__(self, api_key: str):
         self.client = Client(auth=api_key)
 
     def _markdown_to_blocks(self, md: str) -> List[dict]:
         """Delegate markdown conversion to the dedicated converter module."""
-        from .markdown_to_notion import markdown_to_blocks
         return markdown_to_blocks(md)
 
     def list_children(self, parent_block_id: str, page_size: int = 100) -> List[dict]:
