@@ -16,7 +16,7 @@ def test_iter_and_extract_only_notion(tmp_path):
     write(
         root / "A.kt",
         """
-        /* NOTION.One */
+        /* NOTION.A */
         fun main() {
             /**
              * regular doc, ignored
@@ -30,9 +30,7 @@ def test_iter_and_extract_only_notion(tmp_path):
     write(
         root / "nested" / "B.kts",
         """
-        /**
-         *   NOTION.Two
-         */
+        /** NOTION.A.B C **/
         val x = 1
         """.strip(),
     )
@@ -53,13 +51,16 @@ def test_iter_and_extract_only_notion(tmp_path):
     assert any(p.endswith("B.kts") for p in discovered)
     assert any(p.endswith("C.kt") for p in discovered)
 
-    # Extract and collect comment texts; filter is applied inside extract_block_comments_from_file
+    # Extract and collect comment texts and breadcrumbs
     texts = []
+    crumbs = []
     for p in discovered:
         comments = extract_block_comments_from_file(p)
         texts.extend([c.text for c in comments])
+        crumbs.extend([c.breadcrumb for c in comments])
 
     # Only NOTION.* bodies should be present and normalized
-    assert sorted(texts) == ["NOTION.One", "NOTION.Two"]
+    assert sorted(texts) == ["", "C"]
+    assert sorted(crumbs) == [["A"], ["A", "B C"]]
 
 

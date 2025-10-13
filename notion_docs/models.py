@@ -1,11 +1,11 @@
 from dataclasses import dataclass
+from typing import List
 
 
 @dataclass
 class BlockComment:
     file_path: str
-    start_line: int
-    end_line: int
-    text: str
+    text: str  # comment body with breadcrumb removed
+    breadcrumb: List[str]
 
 

@@ -2,7 +2,7 @@ import os
 from typing import Iterator, List
 
 from .models import BlockComment
-from .comments import extract_block_comments_from_text
+from .comments import extract_block_comments_from_text, parse_breadcrumb_and_strip
 
 
 SUPPORTED_EXTENSIONS = {".java", ".kt", ".kts"}
@@ -34,9 +34,18 @@ def extract_block_comments_from_file(path: str) -> List[BlockComment]:
     lang = ext_to_lang(ext)
 
     results: List[BlockComment] = []
-    for start, end, content in extract_block_comments_from_text(text, lang):
-        if content.startswith("NOTION."):
-            results.append(BlockComment(file_path=path, start_line=start, end_line=end, text=content))
+    for comment in extract_block_comments_from_text(text, lang):
+        parsed = parse_breadcrumb_and_strip(comment.text)
+        if parsed is None:
+            continue
+        breadcrumb, remaining = parsed
+        results.append(
+            BlockComment(
+                file_path=path,
+                text=remaining,
+                breadcrumb=breadcrumb,
+            )
+        )
     return results
 
 

@@ -19,7 +19,8 @@ def print_results(results: Iterable[BlockComment], as_json: bool) -> None:
         print(json.dumps([asdict(r) for r in results], ensure_ascii=False, indent=2))
         return
     for r in results:
-        print(f"{r.file_path}:{r.start_line}-{r.end_line}")
+        print(f"{r.file_path}")
+        print(f"Breadcrumb: {' > '.join(r.breadcrumb)}")
         print("/*")
         print(r.text)
         print("*/\n")
