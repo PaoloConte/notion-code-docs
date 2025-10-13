@@ -1,5 +1,5 @@
 import logging
-from typing import List
+from typing import List, Optional
 
 from markdown_it import MarkdownIt
 from markdown_it.token import Token
@@ -9,11 +9,11 @@ logger = logging.getLogger(__name__)
 
 def markdown_to_blocks(md: str) -> List[dict]:
     """Convert Markdown to Notion blocks using a structured Markdown parser (markdown-it-py).
-    Supported blocks: headings (h1–h3), paragraphs, bulleted lists, fenced code.
+    Supported blocks: headings (h1–h3), paragraphs, bulleted lists, fenced code, simple tables.
     Supported inline: bold, italic, inline code.
     """
     md = md or ""
-    md_parser = MarkdownIt("commonmark")
+    md_parser = MarkdownIt("commonmark").enable('table')
     tokens: List[Token] = md_parser.parse(md)
 
     def make_annotations(*, bold: bool = False, italic: bool = False, code: bool = False) -> dict:
@@ -29,15 +29,19 @@ def markdown_to_blocks(md: str) -> List[dict]:
     def rich_from_inline(inline: Token) -> List[dict]:
         bold = False
         italic = False
+        current_link: Optional[str] = None
         segments: List[dict] = []
         buf: List[str] = []
 
         def flush_buf():
-            nonlocal buf, bold, italic
+            nonlocal buf, bold, italic, current_link
             if buf:
+                text_obj = {"content": "".join(buf)}
+                if current_link:
+                    text_obj["link"] = {"url": current_link}
                 segments.append({
                     "type": "text",
-                    "text": {"content": "".join(buf)},
+                    "text": text_obj,
                     "annotations": make_annotations(bold=bold, italic=italic),
                 })
                 buf.clear()
@@ -47,9 +51,12 @@ def markdown_to_blocks(md: str) -> List[dict]:
                 buf.append(t.content)
             elif t.type == "code_inline":
                 flush_buf()
+                text_obj = {"content": t.content}
+                if current_link:
+                    text_obj["link"] = {"url": current_link}
                 segments.append({
                     "type": "text",
-                    "text": {"content": t.content},
+                    "text": text_obj,
                     "annotations": make_annotations(code=True),
                 })
             elif t.type == "strong_open":
@@ -64,6 +71,16 @@ def markdown_to_blocks(md: str) -> List[dict]:
             elif t.type == "em_close":
                 flush_buf()
                 italic = False
+            elif t.type == "link_open":
+                flush_buf()
+                try:
+                    href = t.attrGet("href")
+                except Exception:
+                    href = None
+                current_link = href
+            elif t.type == "link_close":
+                flush_buf()
+                current_link = None
             elif t.type in ("softbreak", "hardbreak"):
                 buf.append(" ")
             else:
@@ -136,6 +153,102 @@ def markdown_to_blocks(md: str) -> List[dict]:
                 },
             })
             i += 1
+            continue
+
+        if tok.type == "table_open":
+            # Parse a simple GFM-style table into a Notion table block
+            has_header = False
+            rows: List[dict] = []
+            table_width = 0
+            i += 1
+            # optional thead
+            if i < len(tokens) and tokens[i].type == "thead_open":
+                has_header = True
+                i += 1  # into thead
+                while i < len(tokens) and tokens[i].type != "thead_close":
+                    if tokens[i].type == "tr_open":
+                        i += 1
+                        cells_rt: List[List[dict]] = []
+                        while i < len(tokens) and tokens[i].type != "tr_close":
+                            if tokens[i].type in ("th_open", "td_open"):
+                                # inline is next significant token before th/td_close
+                                inline = None
+                                j = i + 1
+                                while j < len(tokens) and tokens[j].type not in ("th_close", "td_close"):
+                                    if tokens[j].type == "inline":
+                                        inline = tokens[j]
+                                        break
+                                    j += 1
+                                cell_rich = rich_from_inline(inline) if inline else []
+                                cells_rt.append(cell_rich)
+                                # advance to cell close
+                                while i < len(tokens) and tokens[i].type not in ("th_close", "td_close"):
+                                    i += 1
+                                i += 1  # consume close
+                            else:
+                                i += 1
+                        table_width = max(table_width, len(cells_rt))
+                        rows.append({
+                            "type": "table_row",
+                            "table_row": {"cells": cells_rt},
+                        })
+                        i += 1  # consume tr_close
+                    else:
+                        i += 1
+                i += 1  # consume thead_close
+            # tbody (common path)
+            if i < len(tokens) and tokens[i].type == "tbody_open":
+                i += 1
+                while i < len(tokens) and tokens[i].type != "tbody_close":
+                    if tokens[i].type == "tr_open":
+                        i += 1
+                        cells_rt: List[List[dict]] = []
+                        while i < len(tokens) and tokens[i].type != "tr_close":
+                            if tokens[i].type in ("th_open", "td_open"):
+                                inline = None
+                                j = i + 1
+                                while j < len(tokens) and tokens[j].type not in ("th_close", "td_close"):
+                                    if tokens[j].type == "inline":
+                                        inline = tokens[j]
+                                        break
+                                    j += 1
+                                cell_rich = rich_from_inline(inline) if inline else []
+                                cells_rt.append(cell_rich)
+                                while i < len(tokens) and tokens[i].type not in ("th_close", "td_close"):
+                                    i += 1
+                                i += 1  # consume close
+                            else:
+                                i += 1
+                        table_width = max(table_width, len(cells_rt))
+                        rows.append({
+                            "type": "table_row",
+                            "table_row": {"cells": cells_rt},
+                        })
+                        i += 1  # consume tr_close
+                    else:
+                        i += 1
+                i += 1  # consume tbody_close
+            # consume table_close if present
+            if i < len(tokens) and tokens[i].type == "table_close":
+                i += 1
+            # Normalize each row to table_width by padding empty cells
+            for r in rows:
+                cells = r["table_row"]["cells"]
+                if len(cells) < table_width:
+                    # pad with empty rich_text cells
+                    cells.extend([[] for _ in range(table_width - len(cells))])
+                elif len(cells) > table_width and table_width > 0:
+                    del cells[table_width:]
+            table_block = {
+                "type": "table",
+                "table": {
+                    "table_width": table_width or 0,
+                    "has_column_header": has_header,
+                    "has_row_header": False,
+                },
+                "children": rows,
+            }
+            blocks.append(table_block)
             continue
 
         # Skip other token types (the close tokens will be consumed by their handlers)

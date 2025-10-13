@@ -140,8 +140,31 @@ class NotionClient:
         if markdown_text:
             blocks = self._markdown_to_blocks(markdown_text)
             logger.info("Appending %d blocks to %s", len(blocks), page_id)
-            CHUNK = 50
-            for i in range(0, len(blocks), CHUNK):
-                self.client.blocks.children.append(block_id=page_id, children=blocks[i:i+CHUNK])
+            # Append sequentially to properly handle table blocks (need to append rows under the created table)
+            appended = 0
+            for idx, block in enumerate(blocks):
+                btype = block.get("type")
+                if btype == "table":
+                    # Extract table rows and embed them under table.children per API validation error
+                    rows = block.pop("children", []) or []
+                    tbl = block.get("table", {}) or {}
+                    # Ensure table_width is at least 1 to satisfy API
+                    width = int(tbl.get("table_width") or 0)
+                    if width <= 0:
+                        try:
+                            width = max(1, max((len((r.get("table_row", {}) or {}).get("cells", [])) for r in rows), default=1))
+                        except Exception:
+                            width = 1
+                        tbl["table_width"] = width
+                    # Attach rows under table.children as required by the API
+                    tbl["children"] = rows
+                    block["table"] = tbl
+                    # Append table with its rows in a single request
+                    self.client.blocks.children.append(block_id=page_id, children=[block])
+                    appended += 1
+                else:
+                    # Append non-table blocks directly
+                    self.client.blocks.children.append(block_id=page_id, children=[block])
+                    appended += 1
             # Note: Official API doesn't provide reliable child block reordering across types; subpages may precede text.
-            logger.info("Content appended to %s (text may appear after existing subpages due to API ordering)", page_id)
+            logger.info("Content appended to %s: %d top-level block(s) appended (tables handled with separate row appends)", page_id, appended)
