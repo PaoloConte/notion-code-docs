@@ -35,7 +35,8 @@ def extract_block_comments_from_file(path: str) -> List[BlockComment]:
 
     results: List[BlockComment] = []
     for start, end, content in extract_block_comments_from_text(text, lang):
-        results.append(BlockComment(file_path=path, start_line=start, end_line=end, text=content))
+        if content.startswith("NOTION."):
+            results.append(BlockComment(file_path=path, start_line=start, end_line=end, text=content))
     return results
 
 
