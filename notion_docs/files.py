@@ -1,9 +1,10 @@
 import os
 import hashlib
-from typing import Iterator, List
+from typing import Iterator, List, Tuple, Dict, Set
 
 from .models import BlockComment
 from .comments import extract_block_comments_from_text, parse_breadcrumb_and_strip
+from .mnemonic import compute_mnemonic
 
 
 SUPPORTED_EXTENSIONS = {".java", ".kt", ".kts", ".php"}
@@ -77,21 +78,67 @@ def extract_block_comments_from_file(path: str) -> List[BlockComment]:
 
     # Build a global map of crumb -> concatenated text across all files under the same directory as `path`
     base_dir = os.path.dirname(path)
-    global_texts: dict[tuple, List[str]] = {}
+
+    # First collect all raw crumbs/texts from the tree to build a mnemonic map
+    raw_global_entries: List[Tuple[Tuple[str, ...], str]] = []
     for p in iter_source_files(base_dir):
         for crumb, rem in _collect_from_file(p):
-            global_texts.setdefault(crumb, []).append(rem)
+            raw_global_entries.append((crumb, rem))
 
-    # Compute combined text_hash per unique crumb
-    combined_hash_by_crumb: dict[tuple, str] = {}
+    # Build mnemonic -> set of observed titles (segment strings) across all crumbs
+    mnemo_to_titles: Dict[str, Set[str]] = {}
+    observed_titles: Set[str] = set()
+    for crumb, _ in raw_global_entries:
+        for seg in crumb:
+            observed_titles.add(seg)
+
+    def is_potential_mnemonic(s: str) -> bool:
+        # Consider 3-char uppercase strings that equal their own mnemonic as mnemonic tokens
+        return len(s) == 3 and compute_mnemonic(s) == s.upper()
+
+    # Populate mnemonic map using only non-mnemonic-looking titles, so that
+    # mnemonic placeholders in breadcrumbs don't pollute uniqueness checks
+    for title in observed_titles:
+        if is_potential_mnemonic(title):
+            continue
+        m = compute_mnemonic(title)
+        mnemo_to_titles.setdefault(m, set()).add(title)
+
+    def resolve_segment(seg: str) -> str:
+        # If seg is exactly a known non-mnemonic-looking title, keep as is
+        if seg in observed_titles and not is_potential_mnemonic(seg):
+            return seg
+        # If looks like a 3-char mnemonic, try to resolve to a unique title
+        if len(seg) == 3:
+            m = seg.upper()
+            titles = mnemo_to_titles.get(m)
+            if titles and len(titles) == 1:
+                return next(iter(titles))
+        return seg
+
+    def resolve_crumb(crumb: Tuple[str, ...]) -> Tuple[str, ...]:
+        return tuple(resolve_segment(s) for s in crumb)
+
+    # Group texts by resolved crumbs
+    global_texts: Dict[Tuple[str, ...], List[str]] = {}
+    for crumb, rem in raw_global_entries:
+        rcrumb = resolve_crumb(crumb)
+        global_texts.setdefault(rcrumb, []).append(rem)
+
+    # Compute combined text_hash per unique resolved crumb
+    combined_hash_by_crumb: Dict[Tuple[str, ...], str] = {}
     for crumb, texts in global_texts.items():
         combined_text = "\n".join(texts)
         combined_hash_by_crumb[crumb] = hashlib.sha256(combined_text.encode("utf-8")).hexdigest()
 
+    # Resolve breadcrumbs for current file results as well
+    for r in results:
+        r.breadcrumb = list(resolve_crumb(tuple(r.breadcrumb)))
+
     # Second pass: compute subtree hashes by aggregating combined descendant text hashes across all files
     for i, c in enumerate(results):
         crumb = tuple(c.breadcrumb)
-        descendant_hashes: List[tuple] = []
+        descendant_hashes: List[Tuple[Tuple[str, ...], str]] = []
         for other_crumb, h in combined_hash_by_crumb.items():
             if len(crumb) < len(other_crumb) and list(crumb) == list(other_crumb[: len(crumb)]):
                 descendant_hashes.append((other_crumb, h))
