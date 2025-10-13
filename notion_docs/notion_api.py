@@ -40,9 +40,9 @@ class NotionClient:
                 child = blk.get("child_page", {})
                 title = child.get("title")
                 page_id = blk.get("id")
-                # Check exact title match first
-                if title == segment:
-                    logger.info("Found child page by title '%s' with id %s", title, page_id)
+                # Check title match (case-insensitive) first
+                if (title or "").casefold() == (segment or "").casefold():
+                    logger.info("Found child page by title '%s' (case-insensitive) with id %s", title, page_id)
                     return page_id
                 # If not title, check computed mnemonic match
                 page_mn = compute_mnemonic(title or "")
