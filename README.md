@@ -1,4 +1,4 @@
-WARNING: this project has mostly been written by AI 😄
+**WARNING**: this project has mostly been written by AI 😄
 
 # What is this?
 This python application scans block comments in code containing a special tag and transforms them into Notion pages. 
@@ -23,6 +23,11 @@ The first comment will generate a page named `Application` with the text "This a
 With the second comment, a page `Functions` will be created inside the `Application` page, containing the text 
 `This is a comment` and a list with two items.
 
+# Supported languages
+- Kotlin
+- Java
+- PHP
+- Plain MD files
 
 # Configuration
 Use a config file named `notion-docs.yaml` (or `notion-docs.yml`).
