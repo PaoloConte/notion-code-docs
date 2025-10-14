@@ -35,8 +35,8 @@ titles_matching: prefix
 - `root_page_id` is the ID of the root page in Notion.
 - `titles_matching` is the title matching strategy (all are case-insensitive). Possible values are:
   - `title_only` (default): matches the exact title of the page
-  - `prefix`: matches the exact title of the page, or if it starts with the indicated prefix; useful if pages have a numbering or coding scheme; symbols are ignored 
-  - `mnemonic`:  matches the exact title of the page, or if it starts with the computed mnemonic (see algorithm below)
+  - `prefix`: matches only if the page title starts with the indicated prefix; symbols are ignored; useful if pages have a numbering or coding scheme.
+  - `mnemonic`: matches only if the provided segment equals the computed mnemonic of the page title (see algorithm below); In the case of multiple sibling pages with same mnemonic, the behavior is undefined.
 
 Plus set an environment variable `NOTION_API_KEY` with the API key of your Notion connection.
 

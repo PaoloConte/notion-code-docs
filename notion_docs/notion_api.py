@@ -54,26 +54,31 @@ class NotionClient:
             title = child.get("title") or ""
             page_id = blk.get("id")
 
-            # Always allow exact case-insensitive title match in every mode
-            if title.casefold() == seg_cf:
-                logger.info("Found child page by title '%s' (case-insensitive) with id %s", title, page_id)
-                return page_id
-
             mode = self.titles_matching
-            if mode == "mnemonic":
-                # Match if segment equals computed mnemonic
+
+            if mode == "title_only":
+                # Only exact case-insensitive title match
+                if title.casefold() == seg_cf:
+                    logger.info("Found child page by exact title '%s' (case-insensitive) with id %s", title, page_id)
+                    return page_id
+            elif mode == "mnemonic":
+                # Match only if segment equals computed mnemonic (no exact title fallback)
                 page_mn = compute_mnemonic(title)
                 if page_mn == seg_upper:
                     logger.info("Found child page by computed mnemonic '%s' (title='%s') with id %s", page_mn, title, page_id)
                     return page_id
             elif mode == "prefix":
-                # Match if normalized title starts with normalized segment (symbols ignored, case-insensitive)
-                if seg_norm and norm(title).startswith(seg_norm):
+                # Match only if normalized title starts with normalized segment (symbols ignored, case-insensitive)
+                # Do not match when the normalized segment equals the full normalized title (i.e., exact title)
+                title_norm = norm(title)
+                if seg_norm and title_norm.startswith(seg_norm) and title_norm != seg_norm:
                     logger.info("Found child page by prefix match: segment '%s' matches title '%s' (id=%s)", segment, title, page_id)
                     return page_id
             else:
-                # title_only: only exact title match (already checked above), so continue
-                pass
+                # Unknown mode: fallback to exact only behavior
+                if title.casefold() == seg_cf:
+                    logger.info("Found child page by exact title '%s' (case-insensitive, unknown mode) with id %s", title, page_id)
+                    return page_id
 
         logger.info("Child page for segment '%s' not found under %s", segment, parent_page_id)
         return None
