@@ -30,8 +30,12 @@ def load_config(path_or_dir: Optional[str] = None) -> AppConfig:
 
     If path_or_dir is a file, load that file. If it's a directory (or None),
     search for a known YAML config name in that directory.
+
+    Note: if 'root' in the YAML is a relative path, it is resolved relative to
+    the directory containing the configuration file, not the current working directory.
     """
     print(f"Loading config from {path_or_dir}")
+    config_file_path: Optional[str] = None
     if path_or_dir:
         candidate = os.path.abspath(path_or_dir)
         if os.path.isdir(candidate):
@@ -41,12 +45,14 @@ def load_config(path_or_dir: Optional[str] = None) -> AppConfig:
                 p = os.path.join(base, name)
                 if os.path.exists(p):
                     data = _load_yaml(p)
+                    config_file_path = p
                     break
             if data is None:
                 raise FileNotFoundError(
                     f"No config found in directory {base}. Create one of: {', '.join(YAML_FILES)}"
                 )
         else:
+            config_file_path = candidate
             data = _load_yaml(candidate)
     else:
         base = os.getcwd()
@@ -55,6 +61,7 @@ def load_config(path_or_dir: Optional[str] = None) -> AppConfig:
             p = os.path.join(base, name)
             if os.path.exists(p):
                 data = _load_yaml(p)
+                config_file_path = p
                 break
         if data is None:
             raise FileNotFoundError(
@@ -64,6 +71,15 @@ def load_config(path_or_dir: Optional[str] = None) -> AppConfig:
     root = data.get("root")
     if not isinstance(root, str) or not root:
         raise ValueError("Config 'root' must be a non-empty string")
+    # Resolve relative roots against the directory containing the config file
+    if not os.path.isabs(root):
+        if not config_file_path:
+            # Fallback to current working dir if somehow no config path known
+            base_dir = os.getcwd()
+        else:
+            base_dir = os.path.dirname(os.path.abspath(config_file_path))
+        root = os.path.normpath(os.path.join(base_dir, root))
+
     root_page_id_raw = data.get("root_page_id")
     if root_page_id_raw is None:
         raise ValueError("Config 'root_page_id' must be set")

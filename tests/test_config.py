@@ -22,7 +22,7 @@ def test_load_config_from_file_success(tmp_path, monkeypatch):
     monkeypatch.setenv("NOTION_API_KEY", "secret-key")
 
     cfg = load_config(str(cfg_path))
-    assert cfg.root == "./src"
+    assert cfg.root == str(tmp_path / "src")
     assert cfg.root_page_id == "1234567890abcdef"
     assert cfg.api_key == "secret-key"
 
@@ -39,7 +39,7 @@ def test_load_config_from_dir_success(tmp_path, monkeypatch):
     monkeypatch.setenv("NOTION_API_KEY", "another-secret")
 
     cfg = load_config(str(tmp_path))
-    assert cfg.root == "./"
+    assert cfg.root == str(tmp_path)
     assert cfg.root_page_id == "root-page"
     assert cfg.api_key == "another-secret"
 
