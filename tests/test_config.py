@@ -11,7 +11,7 @@ def write_yaml(p: Path, content: str) -> None:
 
 
 def test_load_config_from_file_success(tmp_path, monkeypatch):
-    cfg_path = tmp_path / "notion.config.yaml"
+    cfg_path = tmp_path / "notion-docs.yaml"
     write_yaml(
         cfg_path,
         """
@@ -28,7 +28,7 @@ def test_load_config_from_file_success(tmp_path, monkeypatch):
 
 
 def test_load_config_from_dir_success(tmp_path, monkeypatch):
-    cfg_path = tmp_path / "notion.config.yml"
+    cfg_path = tmp_path / "notion-docs.yml"
     write_yaml(
         cfg_path,
         """
@@ -45,7 +45,7 @@ def test_load_config_from_dir_success(tmp_path, monkeypatch):
 
 
 def test_missing_root_page_id_raises(tmp_path, monkeypatch):
-    cfg_path = tmp_path / "notion.config.yaml"
+    cfg_path = tmp_path / "notion-docs.yaml"
     write_yaml(
         cfg_path,
         """
@@ -58,7 +58,7 @@ def test_missing_root_page_id_raises(tmp_path, monkeypatch):
 
 
 def test_missing_api_key_raises(tmp_path, monkeypatch):
-    cfg_path = tmp_path / "notion.config.yaml"
+    cfg_path = tmp_path / "notion-docs.yaml"
     write_yaml(
         cfg_path,
         """
