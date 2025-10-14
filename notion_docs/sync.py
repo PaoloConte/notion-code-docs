@@ -56,15 +56,19 @@ def _aggregate_comments(comments: List[BlockComment]) -> Dict[Tuple[str, ...], P
 
 
 
-def sync_to_notion(config: AppConfig, comments: List[BlockComment], dry_run: bool = False) -> None:
+def sync_to_notion(config: AppConfig, comments: List[BlockComment], dry_run: bool = False, force: bool = False) -> None:
     """Sync aggregated comments to Notion under the configured root page.
 
     - One page per breadcrumb (segment path) under root_page_id.
     - Convert markdown to Notion blocks for the leaf's combined text.
     - Store metadata hashes in Notion page properties (Text Hash, Subtree Hash).
-    - Only update a page if hashes changed.
+    - Only update a page if hashes changed, unless `force` is True.
+    - When `force` is True, ignore hashes and update all pages and traverse all subpages.
     """
-    logger.info("Starting sync to Notion: %d comments -> root_page_id=%s", len(comments), getattr(config, 'root_page_id', ''))
+    logger.info(
+        "Starting sync to Notion: %d comments -> root_page_id=%s (force=%s, dry_run=%s)",
+        len(comments), getattr(config, 'root_page_id', ''), force, dry_run,
+    )
     pages = _aggregate_comments(comments)
     if not pages:
         logger.info("No pages to sync (no comments after aggregation). Nothing to do.")
@@ -108,16 +112,19 @@ def sync_to_notion(config: AppConfig, comments: List[BlockComment], dry_run: boo
         state = pages[crumb]
         # Update current page content first
         existing_text_hash, existing_subtree_hash = client.get_metadata(page_id)
-        need_content = existing_text_hash != state.text_hash
-        need_meta = (existing_text_hash != state.text_hash) or (existing_subtree_hash != state.subtree_hash)
+        need_content = force or (existing_text_hash != state.text_hash)
+        need_meta = force or (existing_text_hash != state.text_hash) or (existing_subtree_hash != state.subtree_hash)
         if need_content:
             logger.info("Updating content for page '%s' (id=%s)", " / ".join(crumb), page_id)
             client.replace_page_content(page_id, state.text)
         else:
             logger.info("Content up-to-date for page '%s' (id=%s)", " / ".join(crumb), page_id)
-        # Traverse children only if subtree hash changed
-        if existing_subtree_hash != state.subtree_hash:
-            logger.info("Subtree changed for page '%s' (id=%s); processing subpages", " / ".join(crumb), page_id)
+        # Traverse children only if subtree hash changed, unless forcing
+        if force or (existing_subtree_hash != state.subtree_hash):
+            if force:
+                logger.info("Force enabled; processing all subpages for '%s' (id=%s)", " / ".join(crumb), page_id)
+            else:
+                logger.info("Subtree changed for page '%s' (id=%s); processing subpages", " / ".join(crumb), page_id)
             for child_crumb in children.get(crumb, []):
                 process_node(page_id, child_crumb)
         else:
