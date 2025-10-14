@@ -1,9 +1,9 @@
 WARNING: this project has mostly been written by AI 😄
 
 # What is this?
-This python application scans block comments in code, containing a special tag, and transforms them into Notion pages. 
+This python application scans block comments in code containing a special tag and transforms them into Notion pages. 
 
-As example:
+As an example:
 ```kotlin
 /* NOTION.Application 
  This application says hello
@@ -63,7 +63,8 @@ Examples:
 
 
 # Setup
+- create a config file `notion-docs.yaml` in your project folder (or any folder)
 - create a private Notion connection and get the API key
-- create a notion page and add the connection to id
+- create a notion page and add the connection to it
 - get the page ID and set it in the config file
 - create properties `Subtree Hash` and `Text Hash`
