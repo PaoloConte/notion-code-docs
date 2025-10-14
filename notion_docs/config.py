@@ -17,6 +17,7 @@ class AppConfig:
     root: str
     root_page_id: str
     api_key: str
+    titles_matching: str = "title_only"
 
 
 def _load_yaml(path: str) -> Dict:
@@ -74,6 +75,10 @@ def load_config(path_or_dir: Optional[str] = None) -> AppConfig:
     if not api_key:
         raise ValueError("Environment variable NOTION_API_KEY must be set")
 
-    return AppConfig(root=root, root_page_id=root_page_id, api_key=api_key)
+    titles_matching = str(data.get("titles_matching", "title_only")).strip().lower()
+    if titles_matching not in {"title_only", "prefix", "mnemonic"}:
+        raise ValueError("Config 'titles_matching' must be one of: title_only, prefix, mnemonic")
+
+    return AppConfig(root=root, root_page_id=root_page_id, api_key=api_key, titles_matching=titles_matching)
 
 

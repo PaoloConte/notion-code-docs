@@ -23,9 +23,27 @@ The first comment will generate a page named `Application` with the text "This a
 With the second comment, a page `Functions` will be created inside the `Application` page, containing the text 
 `This is a comment` and a list with two items.
 
+
+# Configuration
+Use a config file named `notion-docs.yaml` (or `notion-docs.yml`).
+```yaml
+root: ./
+root_page_id: YOUR_NOTION_ROOT_PAGE_ID
+titles_matching: prefix
+```
+- `root` is the directory where the source code is located.
+- `root_page_id` is the ID of the root page in Notion.
+- `titles_matching` is the title matching strategy (all are case-insensitive). Possible values are:
+  - `title_only` (default): matches the exact title of the page
+  - `prefix`: matches the exact title of the page, or if it starts with the indicated prefix; useful if pages have a numbering or coding scheme; symbols are ignored 
+  - `mnemonic`:  matches the exact title of the page, or if it starts with the computed mnemonic (see algorithm below)
+
+Plus set an environment variable `NOTION_API_KEY` with the API key of your Notion connection.
+
+
 ### Mnemonic
 To address pages, as an alternative to the exact page title, it's possible to use a mnemonic with a standardized format.
-Here is how to calculate it:
+Here is how it is calculated:
 - Ignore spaces and symbols.
 - Three uppercase letters or numbers.
 - The first letter of the code is the first letter of the title.
@@ -43,16 +61,6 @@ Examples:
 - "123abc" → 1BC
 - "!!!" → XXX
 
-# Configuration
-Use a config file named `notion-docs.yaml` (or `notion-docs.yml`).
-```yaml
-root: ./
-root_page_id: YOUR_NOTION_ROOT_PAGE_ID
-```
-- `root` is the directory where the source code is located.
-- `root_page_id` is the ID of the root page in Notion.
-
-Plus set an environment variable `NOTION_API_KEY` with the API key of your Notion connection.
 
 # Setup
 - create a private Notion connection and get the API key

@@ -9,8 +9,9 @@ from .markdown_to_notion import markdown_to_blocks
 from .mnemonic import compute_mnemonic
 
 class NotionClient:
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str, titles_matching: str = "title_only"):
         self.client = Client(auth=api_key)
+        self.titles_matching = (titles_matching or "title_only").lower()
 
 
     def _markdown_to_blocks(self, md: str) -> List[dict]:
@@ -32,23 +33,48 @@ class NotionClient:
 
     def find_child_page(self, parent_page_id: str, segment: str) -> Optional[str]:
         # For a page parent, the child pages appear as child_page blocks under the page's block children
-        # Matching uses both the page title and the computed mnemonic, in a single pass.
-        logger.info("Searching for child page matching segment '%s' under %s", segment, parent_page_id)
-        segment_upper = (segment or "").upper()
+        logger.info("Searching for child page matching segment '%s' under %s (mode=%s)", segment, parent_page_id, self.titles_matching)
+
+        def norm(s: Optional[str]) -> str:
+            # Remove symbols/spaces and casefold for prefix mode comparisons
+            if not s:
+                return ""
+            import re
+            return re.sub(r"[^A-Za-z0-9]", "", s).casefold()
+
+        seg = segment or ""
+        seg_cf = seg.casefold()
+        seg_upper = seg.upper()
+        seg_norm = norm(seg)
+
         for blk in self.list_children(parent_page_id):
-            if blk.get("type") == "child_page":
-                child = blk.get("child_page", {})
-                title = child.get("title")
-                page_id = blk.get("id")
-                # Check title match (case-insensitive) first
-                if (title or "").casefold() == (segment or "").casefold():
-                    logger.info("Found child page by title '%s' (case-insensitive) with id %s", title, page_id)
-                    return page_id
-                # If not title, check computed mnemonic match
-                page_mn = compute_mnemonic(title or "")
-                if page_mn == segment_upper:
+            if blk.get("type") != "child_page":
+                continue
+            child = blk.get("child_page", {})
+            title = child.get("title") or ""
+            page_id = blk.get("id")
+
+            # Always allow exact case-insensitive title match in every mode
+            if title.casefold() == seg_cf:
+                logger.info("Found child page by title '%s' (case-insensitive) with id %s", title, page_id)
+                return page_id
+
+            mode = self.titles_matching
+            if mode == "mnemonic":
+                # Match if segment equals computed mnemonic
+                page_mn = compute_mnemonic(title)
+                if page_mn == seg_upper:
                     logger.info("Found child page by computed mnemonic '%s' (title='%s') with id %s", page_mn, title, page_id)
                     return page_id
+            elif mode == "prefix":
+                # Match if normalized title starts with normalized segment (symbols ignored, case-insensitive)
+                if seg_norm and norm(title).startswith(seg_norm):
+                    logger.info("Found child page by prefix match: segment '%s' matches title '%s' (id=%s)", segment, title, page_id)
+                    return page_id
+            else:
+                # title_only: only exact title match (already checked above), so continue
+                pass
+
         logger.info("Child page for segment '%s' not found under %s", segment, parent_page_id)
         return None
 
