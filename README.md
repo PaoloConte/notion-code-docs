@@ -23,6 +23,9 @@ The first comment will generate a page named `Application` with the text "This a
 With the second comment, a page `Functions` will be created inside the `Application` page, containing the text 
 `This is a comment` and a list with two items.
 
+Adding a pound symbol (`#`) and a number at the end of the tag will be used to sort multiple comments on the same page.
+For example, `NOTION.Application#1` will be the first comment on the page. The default sort index is a high number.
+
 # Supported languages
 - Kotlin
 - Java

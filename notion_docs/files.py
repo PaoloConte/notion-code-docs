@@ -1,6 +1,7 @@
 import os
 import hashlib
-from typing import Iterator, List, Tuple, Dict, Set
+from typing import Iterator, List, Tuple, Dict, Set, Optional
+import re
 
 from .models import BlockComment
 from .comments import extract_block_comments_from_text, parse_breadcrumb_and_strip
@@ -27,6 +28,26 @@ def ext_to_lang(ext: str) -> str:
     if ext == ".md":
         return "markdown"
     return "kotlin"
+
+
+def _strip_sort_index(breadcrumb: List[str]) -> Tuple[List[str], Optional[int]]:
+    """If the last breadcrumb segment ends with #<number>, strip it and return the number.
+
+    Example: ["A", "B#3"] -> (["A", "B"], 3)
+    Only matches if '#' is immediately followed by digits at the end of the last segment.
+    """
+    if not breadcrumb:
+        return breadcrumb, None
+    last = breadcrumb[-1]
+    m = re.match(r"^(.*?)(?:#(\d+))$", last)
+    if m:
+        base, num = m.group(1), m.group(2)
+        cleaned = breadcrumb[:-1] + [base]
+        try:
+            return cleaned, int(num)
+        except ValueError:
+            return cleaned, None
+    return breadcrumb, None
 
 
 def extract_block_comments_from_file(path: str) -> List[BlockComment]:
@@ -56,8 +77,10 @@ def extract_block_comments_from_file(path: str) -> List[BlockComment]:
             if parsed is None:
                 continue
             bc, rem = parsed
+            # Normalize breadcrumb by stripping any trailing #<num> from the last segment
+            cleaned_bc, _ = _strip_sort_index(list(bc))
             # Return raw remaining text; aggregation and hashing will be done globally per crumb
-            entries.append((tuple(bc), rem))
+            entries.append((tuple(cleaned_bc), rem))
         return entries
 
     # First pass: collect NOTION comments in the requested file with text and text_hash only
@@ -67,12 +90,15 @@ def extract_block_comments_from_file(path: str) -> List[BlockComment]:
         if parsed is None:
             continue
         breadcrumb, remaining = parsed
+        # Extract optional sort_index and clean breadcrumb
+        cleaned_breadcrumb, sort_index = _strip_sort_index(list(breadcrumb))
         text_hash = hashlib.sha256(remaining.encode("utf-8")).hexdigest()
         results.append(
             BlockComment(
                 file_path=path,
                 text=remaining,
-                breadcrumb=breadcrumb,
+                breadcrumb=cleaned_breadcrumb,
+                sort_index=sort_index,
                 text_hash=text_hash,
                 subtree_hash="",
             )
