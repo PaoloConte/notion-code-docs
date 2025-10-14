@@ -62,9 +62,56 @@ Examples:
 - "!!!" → XXX
 
 
-# Setup
-- create a config file `notion-docs.yaml` in your project folder (or any folder)
+# Notion Setup
 - create a private Notion connection and get the API key
 - create a notion page and add the connection to it
 - get the page ID and set it in the config file
 - create properties `Subtree Hash` and `Text Hash`
+
+
+# Usage
+
+- Ensure you have Python 3.9+ installed.
+- Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+- Set the Notion API key environment variable (replace with your key):
+
+```bash
+export NOTION_API_KEY="secret_xxx_your_notion_integration_key"
+```
+
+- Create or update the config file notion-docs.yaml in the directory you want to scan (see Configuration above). For example:
+
+```yaml
+root: ./
+root_page_id: YOUR_NOTION_ROOT_PAGE_ID
+titles_matching: prefix
+```
+
+- Run the sync:
+
+```bash
+python3 main.py --config /path/to/dir-or-config-file
+```
+
+Useful flags:
+- -v or --verbose to enable debug logging
+- --log-level {CRITICAL,ERROR,WARNING,INFO,DEBUG,NOTSET} to set an explicit level
+- --force to ignore hashes and update all pages regardless of changes
+
+Examples:
+
+```bash
+# From the project root, using a config file in the current directory
+python3 main.py --config .
+
+# Use a different folder that contains notion-docs.yaml
+python3 main.py --config ~/code/my-project
+
+# Force full re-sync with verbose logging
+python3 main.py --config . --force -v
+```
