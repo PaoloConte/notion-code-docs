@@ -9,7 +9,11 @@ from pygments.token import Token
 
 def _normalize_block_comment_text(raw: str) -> str:
     without_delims = re.sub(r'^\s*/\*+\s?', '', raw)
-    without_delims = re.sub(r'\s*\*+/\s*$', '', without_delims)
+    # Remove the closing delimiter and any whitespace after it, but at most
+    # a single space immediately before it. This preserves meaningful trailing
+    # spaces (e.g., two spaces for Markdown line breaks) while trimming the
+    # common stylistic single space before */.
+    without_delims = re.sub(r' ?\*+/\s*$', '', without_delims)
 
     lines = [re.sub(r'^\s*\*+\s?', '', line) for line in without_delims.splitlines()]
 

@@ -81,8 +81,13 @@ def markdown_to_blocks(md: str) -> List[dict]:
             elif t.type == "link_close":
                 flush_buf()
                 current_link = None
-            elif t.type in ("softbreak", "hardbreak"):
+            elif t.type == "softbreak":
                 buf.append(" ")
+            elif t.type == "hardbreak":
+                # Preserve explicit hard line breaks (two trailing spaces or backslash EOL)
+                # by inserting a newline into the text buffer. This avoids relying on
+                # trailing spaces in source files, which some IDEs trim automatically.
+                buf.append("\n")
             else:
                 # Skip unsupported inline tokens safely
                 pass
