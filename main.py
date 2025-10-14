@@ -18,6 +18,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         choices=["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "NOTSET"],
         help="Set logging level (overrides --verbose)."
     )
+    parser.add_argument("--force", action="store_true", help="Ignore hashes and update all pages")
     args = parser.parse_args(argv)
 
     # Configure logging early
@@ -29,7 +30,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     cfg = load_config(args.config)
     results = run(cfg.root, SUPPORTED_EXTENSIONS)
-    sync_to_notion(cfg, results)
+    sync_to_notion(cfg, results, force=args.force)
     return 0
 
 
