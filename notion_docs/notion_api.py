@@ -9,9 +9,10 @@ from .markdown_to_notion import markdown_to_blocks
 from .mnemonic import compute_mnemonic
 
 class NotionClient:
-    def __init__(self, api_key: str, titles_matching: str = "title_only"):
+    def __init__(self, api_key: str, titles_matching: str = "title_only", header: Optional[str] = None):
         self.client = Client(auth=api_key)
         self.titles_matching = (titles_matching or "title_only").lower()
+        self.header = (header or "").strip() or None
 
 
     def _markdown_to_blocks(self, md: str) -> List[dict]:
@@ -181,6 +182,29 @@ class NotionClient:
         # Build new content blocks and append
         if markdown_text:
             blocks = self._markdown_to_blocks(markdown_text)
+            # Prepend header callout if configured
+            if self.header:
+                header_block = {
+                    "type": "callout",
+                    "callout": {
+                        "rich_text": [
+                            {
+                                "type": "text",
+                                "text": {"content": self.header},
+                                "annotations": {
+                                    "bold": False,
+                                    "italic": False,
+                                    "strikethrough": False,
+                                    "underline": False,
+                                    "code": False,
+                                    "color": "default",
+                                },
+                            }
+                        ],
+                        "icon": {"type": "emoji", "emoji": "✨"},
+                    },
+                }
+                blocks = [header_block] + blocks
             logger.info("Appending %d blocks to %s", len(blocks), page_id)
             # Append sequentially to properly handle table blocks (need to append rows under the created table)
             appended = 0
