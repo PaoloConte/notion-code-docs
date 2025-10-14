@@ -25,7 +25,8 @@ def _aggregate_comments(comments: List[BlockComment]) -> Dict[Tuple[str, ...], P
     for c in comments:
         by_crumb.setdefault(tuple(c.breadcrumb), []).append(c)
     for lst in by_crumb.values():
-        lst.sort(key=lambda x: (x.file_path, x.text))
+        # Sort within the same breadcrumb by sort_index where None is treated as a very high number (fallback), then by file_path and text for stability
+        lst.sort(key=lambda x: (x.sort_index if x.sort_index is not None else 1_000_000_000, x.file_path, x.text))
 
     # Build a full set of breadcrumbs including all ancestors so that parents exist even if not directly documented
     crumbs_with_comments = set(by_crumb.keys())
