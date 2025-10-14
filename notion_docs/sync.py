@@ -81,7 +81,7 @@ def sync_to_notion(config: AppConfig, comments: List[BlockComment], dry_run: boo
             logger.info("[DRY RUN] Would ensure page: %s", " / ".join(crumb))
         return
 
-    client = NotionClient(config.api_key, getattr(config, 'titles_matching', 'title_only'))
+    client = NotionClient(config.api_key, getattr(config, 'titles_matching', 'title_only'), getattr(config, 'header', None))
 
     # Build children mapping for top-down traversal
     children: Dict[Tuple[str, ...], List[Tuple[str, ...]]] = {}
