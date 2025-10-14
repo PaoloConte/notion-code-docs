@@ -1,10 +1,12 @@
-import json
+import logging
+import logging
 import os
 from dataclasses import dataclass
 from typing import Optional, Dict
 
 import yaml
 
+logger = logging.getLogger(__name__)
 
 YAML_FILES = [
     "notion-docs.yaml",
@@ -35,7 +37,7 @@ def load_config(path_or_dir: Optional[str] = None) -> AppConfig:
     Note: if 'root' in the YAML is a relative path, it is resolved relative to
     the directory containing the configuration file, not the current working directory.
     """
-    print(f"Loading config from {path_or_dir}")
+    logger.info(f"Loading config from {path_or_dir}")
     config_file_path: Optional[str] = None
     if path_or_dir:
         candidate = os.path.abspath(path_or_dir)

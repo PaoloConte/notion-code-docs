@@ -27,9 +27,22 @@ def _aggregate_comments(comments: List[BlockComment]) -> Dict[Tuple[str, ...], P
     for lst in by_crumb.values():
         lst.sort(key=lambda x: (x.file_path, x.text))
 
-    combined_text: Dict[Tuple[str, ...], str] = {
-        crumb: "\n\n".join(c.text for c in lst) for crumb, lst in by_crumb.items()
-    }
+    # Build a full set of breadcrumbs including all ancestors so that parents exist even if not directly documented
+    crumbs_with_comments = set(by_crumb.keys())
+    all_crumbs_set = set(crumbs_with_comments)
+    for crumb in list(crumbs_with_comments):
+        # add all prefixes (ancestors), excluding the empty root tuple
+        for i in range(1, len(crumb)):
+            all_crumbs_set.add(crumb[:i])
+
+    # Prepare combined text for all crumbs; ancestors without direct comments get empty text
+    combined_text: Dict[Tuple[str, ...], str] = {}
+    for crumb in all_crumbs_set:
+        if crumb in by_crumb:
+            combined_text[crumb] = "\n\n".join(c.text for c in by_crumb[crumb])
+        else:
+            combined_text[crumb] = ""
+
     combined_text_hash: Dict[Tuple[str, ...], str] = {
         crumb: hashlib.sha256(txt.encode("utf-8")).hexdigest()
         for crumb, txt in combined_text.items()
@@ -37,7 +50,7 @@ def _aggregate_comments(comments: List[BlockComment]) -> Dict[Tuple[str, ...], P
 
     # Compute subtree hashes: for each crumb, SHA256 of newline-joined strict descendant combined text hashes
     subtree_hash: Dict[Tuple[str, ...], str] = {}
-    all_crumbs = sorted(combined_text_hash.keys())
+    all_crumbs = sorted(all_crumbs_set)
     for crumb in all_crumbs:
         descendant_hashes: List[Tuple[Tuple[str, ...], str]] = []
         for other, h in combined_text_hash.items():
@@ -47,7 +60,7 @@ def _aggregate_comments(comments: List[BlockComment]) -> Dict[Tuple[str, ...], P
         joined = "\n".join(h for _, h in descendant_hashes)
         subtree_hash[crumb] = hashlib.sha256(joined.encode("utf-8")).hexdigest()
 
-    logger.info("Aggregated into %d breadcrumbs", len(all_crumbs))
+    logger.info("Aggregated into %d breadcrumbs (including ancestors)", len(all_crumbs))
     return {
         crumb: PageState(text=combined_text[crumb], text_hash=combined_text_hash[crumb], subtree_hash=subtree_hash[crumb])
         for crumb in all_crumbs
