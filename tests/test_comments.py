@@ -23,6 +23,25 @@ fun main() {
      * *COMMENT 5*
      *  - note
      */
+     
+/** NOTION.FTR.AVS
+
+    ### API
+    Text
+**/
+
+/** NOTION.FTR.AVS
+ *
+ *  ### API
+ *  Text
+**/
+
+    /** NOTION.INT.DPL
+     * ### Title
+     *
+     * Text
+     */
+     
 }
 """
 
@@ -30,12 +49,15 @@ fun main() {
 def test_extract_block_comments_from_text_normalization():
     bodies = extract_block_comments_from_text(SAMPLE_KOTLIN, lang="kotlin")
 
-    assert len(bodies) == 5
+    assert len(bodies) == 8
     assert bodies[0] == "COMMENT 1"
     assert bodies[1] == "COMMENT 2"
     assert bodies[2] == "COMMENT 3\n - indented"
     assert bodies[3] == "COMMENT 4\n this is a comment"
     assert bodies[4] == "*COMMENT 5*\n - note"
+    assert bodies[5] == "NOTION.FTR.AVS\n\n### API\nText"
+    assert bodies[6] == "NOTION.FTR.AVS\n\n### API\nText"
+    assert bodies[7] == "NOTION.INT.DPL\n### Title\n\nText"
 
 
 def test_parse_breadcrumb_and_strip():

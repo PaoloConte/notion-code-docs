@@ -8,37 +8,113 @@ from pygments.token import Token
 
 
 def _normalize_block_comment_text(raw: str) -> str:
-    without_delims = re.sub(r'^\s*/\*+\s?', '', raw)
-    # Remove the closing delimiter and any whitespace after it, but at most
-    # a single space immediately before it. This preserves meaningful trailing
-    # spaces (e.g., two spaces for Markdown line breaks) while trimming the
-    # common stylistic single space before */.
-    without_delims = re.sub(r' ?\*+/\s*$', '', without_delims)
+    # Replace opening and closing block comment delimiters with same-length spaces,
+    # preserving surrounding spaces. Do not trim inner content yet.
+    def replace_opening(m: re.Match) -> str:
+        token = m.group(0)
+        # Replace only the '/**' or '/*' part with spaces; keep any following space intact
+        stars = re.match(r"/\*+", token)
+        if not stars:
+            return token
+        return " " * len(stars.group(0)) + token[len(stars.group(0)) :]
 
-    lines = [re.sub(r'^\s*\*+\s?', '', line) for line in without_delims.splitlines()]
+    def replace_closing(m: re.Match) -> str:
+        token = m.group(0)
+        # Replace only the '*/' part (with leading *s) with spaces; keep preceding spaces intact
+        stars = re.search(r"\*+/", token)
+        if not stars:
+            return token
+        start, end = stars.span()
+        return token[:start] + (" " * (end - start)) + token[end:]
 
-    while lines and lines[0].strip() == '':
+    # Apply only at the very start and very end of the comment token
+    s = re.sub(r"^/\*+ ?", replace_opening, raw)
+    s = re.sub(r" ?\*+/\s*$", replace_closing, s)
+
+    lines = s.splitlines()
+
+    # Remove leading/trailing completely empty lines
+    while lines and lines[0].strip() == "":
         lines.pop(0)
-    while lines and lines[-1].strip() == '':
+    while lines and lines[-1].strip() == "":
         lines.pop()
 
     if not lines:
         return ""
 
-    leading_ws = []
-    for line in lines:
-        if line.strip() == '':
-            continue
-        m = re.match(r"^[\t ]*", line)
-        leading_ws.append(m.group(0) if m else "")
+    def trim_common_indent(ls: List[str]) -> List[str]:
+        # Compute common leading whitespace among non-empty lines and trim it
+        non_empty = [l for l in ls if l.strip() != ""]
+        if not non_empty:
+            return ls
+        prefixes = []
+        for l in non_empty:
+            m = re.match(r"^[\t ]*", l)
+            prefixes.append(m.group(0) if m else "")
+        common = prefixes[0]
+        for ws in prefixes[1:]:
+            while not ws.startswith(common) and common:
+                common = common[:-1]
+        if not common:
+            return ls
+        return [l[len(common):] if l.startswith(common) else l for l in ls]
 
-    if leading_ws:
-        common_prefix = leading_ws[0]
-        for ws in leading_ws[1:]:
-            while not ws.startswith(common_prefix) and common_prefix:
-                common_prefix = common_prefix[:-1]
-        if common_prefix:
-            lines = [line[len(common_prefix):] if line.startswith(common_prefix) else line for line in lines]
+    # First: trim maximum common indentation
+    lines = trim_common_indent(lines)
+
+    # Star-strip if all non-empty lines start with '*', or if all lines EXCEPT the first non-empty start with '*'.
+    # This ignores the first line which may contain the opening '/*' content on the same line.
+    non_empty_lines = [l for l in lines if l.strip() != ""]
+
+    def is_star_line(l: str) -> bool:
+        # Consider lines that start with '*' or with a single leading space/tab before '*'
+        return bool(re.match(r"^[ \t]?\*", l))
+
+    def is_breadcrumb_line(l: str) -> bool:
+        return l.lstrip().startswith("NOTION.")
+
+    should_star_strip = False
+    if non_empty_lines:
+        # Case 1: every non-empty line starts with '*'
+        if all(is_star_line(l) for l in non_empty_lines):
+            should_star_strip = True
+        else:
+            # Case 2: ignore the first non-empty line when checking (it may start with '/')
+            tail = non_empty_lines[1:]
+            if tail and all(is_star_line(l) for l in tail):
+                should_star_strip = True
+            # Preserve breadcrumb-first special case as well
+            elif is_breadcrumb_line(non_empty_lines[0]) and all(is_star_line(l) for l in non_empty_lines[1:]):
+                should_star_strip = True
+
+    if should_star_strip:
+        new_lines: List[str] = []
+        for l in lines:
+            if l.startswith("*"):
+                l = l[1:]
+                if l.startswith(" "):
+                    l = l[1:]
+            elif l.startswith(" *"):
+                # Remove a single leading space/tab before '*', then behave like above
+                l = l[2:]
+                if l.startswith(" "):
+                    l = l[1:]
+            new_lines.append(l)
+        lines = new_lines
+        lines = trim_common_indent(lines)
+
+    # Remove leading/trailing completely empty lines again
+    while lines and lines[0].strip() == "":
+        lines.pop(0)
+    while lines and lines[-1].strip() == "":
+        lines.pop()
+
+    # Trim trailing whitespace on each line to avoid artifacts from delimiter replacement
+    lines = [l.rstrip() for l in lines]
+
+    # Ensure breadcrumb line is not indented: strip leading spaces/tabs if first line is NOTION.*
+    if lines and re.match(r"^\s*NOTION\.", lines[0]):
+        lines[0] = lines[0].lstrip(" \t")
 
     return "\n".join(lines)
 

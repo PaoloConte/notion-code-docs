@@ -160,6 +160,18 @@ def markdown_to_blocks(md: str) -> List[dict]:
             i += 1
             continue
 
+        if tok.type == "code_block":
+            # Indented code block (no explicit language)
+            blocks.append({
+                "type": "code",
+                "code": {
+                    "rich_text": [{"type": "text", "text": {"content": tok.content.rstrip('\n')}}],
+                    "language": "plain text",
+                },
+            })
+            i += 1
+            continue
+
         if tok.type == "table_open":
             # Parse a simple GFM-style table into a Notion table block
             has_header = False
