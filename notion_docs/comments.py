@@ -115,6 +115,28 @@ def _normalize_block_comment_text(raw: str) -> str:
     # Ensure breadcrumb line is not indented: strip leading spaces/tabs if first line is NOTION.*
     if lines and re.match(r"^\s*NOTION\.", lines[0]):
         lines[0] = lines[0].lstrip(" \t")
+        # If subsequent lines are visually aligned with the breadcrumb due to extra indentation,
+        # remove their common leading whitespace equally.
+        tail_non_empty = [l for l in lines[1:] if l.strip() != ""]
+        if tail_non_empty:
+            # Compute common leading whitespace among tail non-empty lines
+            def leading_ws(s: str) -> str:
+                m = re.match(r"^[\t ]*", s)
+                return m.group(0) if m else ""
+            common_ws = leading_ws(tail_non_empty[0])
+            for t in tail_non_empty[1:]:
+                ws = leading_ws(t)
+                # Reduce common prefix to the shared part
+                while not ws.startswith(common_ws) and common_ws:
+                    common_ws = common_ws[:-1]
+            if common_ws:
+                new_tail: List[str] = []
+                for l in lines[1:]:
+                    if l.startswith(common_ws):
+                        new_tail.append(l[len(common_ws):])
+                    else:
+                        new_tail.append(l)
+                lines = [lines[0]] + new_tail
 
     return "\n".join(lines)
 
