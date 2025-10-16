@@ -3,6 +3,8 @@ from typing import List, Optional, Any, Dict
 
 from markdown_it import MarkdownIt
 from markdown_it.token import Token
+from urllib.parse import urlparse
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +28,32 @@ def markdown_to_blocks(md: str) -> List[dict]:
             "color": "default",
         }
 
+    def is_notion_url(url: Optional[str]) -> bool:
+        if not url:
+            return False
+        try:
+            u = urlparse(url)
+            host = (u.netloc or "").lower()
+            # notion main domains and public site domains
+            return host.endswith("notion.so") or host.endswith("notion.site")
+        except Exception:
+            return False
+
+    def extract_page_id(url: Optional[str]) -> Optional[str]:
+        """Extract and normalize a Notion page ID from the given URL.
+        Returns hyphenated lowercase UUID if found, else None.
+        """
+        if not url:
+            return None
+        m = re.search(r"([0-9a-fA-F]{32}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})", url)
+        if not m:
+            return None
+        token = m.group(1).lower()
+        if len(token) == 32:
+            # insert dashes 8-4-4-4-12
+            return f"{token[0:8]}-{token[8:12]}-{token[12:16]}-{token[16:20]}-{token[20:32]}"
+        return token
+
     def rich_from_inline(inline: Token) -> List[dict]:
         bold = False
         italic = False
@@ -36,7 +64,24 @@ def markdown_to_blocks(md: str) -> List[dict]:
         def flush_buf():
             nonlocal buf, bold, italic, current_link
             if buf:
-                text_obj: Dict[str, Any] = {"content": "".join(buf)}
+                content_text = "".join(buf)
+                if current_link and is_notion_url(current_link):
+                    page_id = extract_page_id(current_link)
+                    if page_id:
+                        segments.append({
+                            "type": "mention",
+                            "mention": {
+                                "type": "page",
+                                "page": {"id": page_id},
+                            },
+                            "annotations": make_annotations(bold=bold, italic=italic),
+                            "plain_text": content_text,
+                            "href": current_link,
+                        })
+                        buf.clear()
+                        return
+                # default: plain text (possibly linked)
+                text_obj: Dict[str, Any] = {"content": content_text}
                 if current_link:
                     text_obj["link"] = {"url": current_link}
                 segments.append({
@@ -51,6 +96,21 @@ def markdown_to_blocks(md: str) -> List[dict]:
                 buf.append(t.content)
             elif t.type == "code_inline":
                 flush_buf()
+                # If inside a Notion link, emit a mention segment with the code content as plain_text
+                if current_link and is_notion_url(current_link):
+                    page_id = extract_page_id(current_link)
+                    if page_id:
+                        segments.append({
+                            "type": "mention",
+                            "mention": {
+                                "type": "page",
+                                "page": {"id": page_id},
+                            },
+                            "annotations": make_annotations(code=True),
+                            "plain_text": t.content,
+                            "href": current_link,
+                        })
+                        continue
                 text_obj: Dict[str, Any] = {"content": t.content}
                 if current_link:
                     text_obj["link"] = {"url": current_link}
