@@ -109,9 +109,6 @@ def _normalize_block_comment_text(raw: str) -> str:
     while lines and lines[-1].strip() == "":
         lines.pop()
 
-    # Trim trailing whitespace on each line to avoid artifacts from delimiter replacement
-    lines = [l.rstrip() for l in lines]
-
     # Ensure breadcrumb line is not indented: strip leading spaces/tabs if first line is NOTION.*
     if lines and re.match(r"^\s*NOTION\.", lines[0]):
         lines[0] = lines[0].lstrip(" \t")
@@ -138,7 +135,8 @@ def _normalize_block_comment_text(raw: str) -> str:
                         new_tail.append(l)
                 lines = [lines[0]] + new_tail
 
-    return "\n".join(lines)
+    lines = [l if l.strip() else "" for l in lines]
+    return "\n".join(lines).rstrip()
 
 
 def extract_block_comments_from_text(text: str, lang: str) -> List[str]:
