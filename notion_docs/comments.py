@@ -71,7 +71,8 @@ def _normalize_block_comment_text(raw: str) -> str:
         return bool(re.match(r"^[ \t]?\*", l))
 
     def is_breadcrumb_line(l: str) -> bool:
-        return l.lstrip().startswith("NOTION.")
+        ls = l.lstrip()
+        return ls.startswith("NOTION.") or ls.startswith("NOTION/")
 
     should_star_strip = False
     if non_empty_lines:
@@ -110,7 +111,7 @@ def _normalize_block_comment_text(raw: str) -> str:
         lines.pop()
 
     # Ensure breadcrumb line is not indented: strip leading spaces/tabs if first line is NOTION.*
-    if lines and re.match(r"^\s*NOTION\.", lines[0]):
+    if lines and re.match(r"^\s*NOTION[\./]", lines[0]):
         lines[0] = lines[0].lstrip(" \t")
         # If subsequent lines are visually aligned with the breadcrumb due to extra indentation,
         # remove their common leading whitespace equally.
@@ -165,10 +166,10 @@ def parse_breadcrumb_and_strip(body: str) -> Optional[Tuple[List[str], str]]:
     """Parse a NOTION.* breadcrumb at the start of body and strip it.
 
     Returns a tuple (breadcrumb, remaining_text) if present, otherwise None.
-    Breadcrumb segments are split on '.' after the NOTION. prefix and may
-    include spaces or symbols as part of each segment. The only delimiter is '.'.
+    Breadcrumb segments are split on '.' or '/' after the NOTION prefix and may
+    include spaces or symbols as part of each segment. The delimiters are '.' and '/'.
     """
-    if not body.startswith("NOTION."):
+    if not (body.startswith("NOTION.") or body.startswith("NOTION/")):
         return None
     # Determine token boundary:
     # - If a newline exists, the token runs until the newline (spaces allowed inside segments)
@@ -193,10 +194,14 @@ def parse_breadcrumb_and_strip(body: str) -> Optional[Tuple[List[str], str]]:
     # Strip only leading whitespace/newlines from the remaining text
     rest = rest.lstrip(" \t\n")
 
-    # token is like NOTION.A.B.C — extract segments after NOTION.
-    segments_part = token[len("NOTION."):]
-    segments = segments_part.split(".") if segments_part else []
-    # Special case: if no '.' was present (single segment), allow splitting by whitespace
+    # token is like NOTION.A/B.C — extract segments after NOTION separator ('.' or '/')
+    sep = token[len("NOTION"):len("NOTION")+1] if len(token) > len("NOTION") else "."
+    if sep not in (".", "/"):
+        sep = "."
+    segments_part = token[len("NOTION")+1:]
+    # Split on both '.' and '/'
+    segments = [p for p in re.split(r"[\./]", segments_part) if p] if segments_part else []
+    # Special case: if no '.' or '/' was present (single segment), allow splitting by whitespace
     if len(segments) == 1:
         only = segments[0].strip()
         if only:
