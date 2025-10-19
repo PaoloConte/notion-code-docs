@@ -22,10 +22,10 @@ runs:
 
     - name: Install dependencies
       shell: bash
-      run: pip install -r requirements.txt
+      run: pip install -r "$GITHUB_ACTION_PATH/requirements.txt"
 
     - name: Run Notion Docs Sync
       shell: bash
       env:
         NOTION_API_KEY: ${{ inputs.notion-token }}
-      run: python main.py --config "${{ inputs.config }}"
+      run: python "$GITHUB_ACTION_PATH/main.py" --config "${{ inputs.config }}"
