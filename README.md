@@ -132,3 +132,28 @@ python3 main.py --config . --force -v
 - Some IDEs, such as IntelliJ, may strip spaces at the end of lines; this interferes with markdown parsing 
 where double spaces are used to indicate a line break; so it may be useful to disable this feature.
 - Pay attention to the indentation of the comments, all lines should be aligned
+
+
+## Using the GitHub Action
+Prerequisites:
+- Prepare Notion as explained above.
+- Create the configuration file `notion-docs.yaml` in your project.
+- Add the key to your GitHub repository secrets as NOTION_API_KEY.
+- Add the action to your workflow.
+
+Example workflow:
+
+```yaml
+name: Notion Docs Sync
+on:
+  workflow_dispatch: {}
+
+jobs:
+  notion-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: PaoloConte/notion-code-docs
+        with:
+          notion-token: ${{ secrets.NOTION_TOKEN }}
+          config: .
+```

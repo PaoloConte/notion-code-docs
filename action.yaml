@@ -1,0 +1,28 @@
+name: "Notion Docs Sync"
+description: "Scan source files for NOTION.* comments and sync pages to Notion"
+
+inputs:
+  notion-token:
+    description: "Notion API key (pass from secrets)"
+    required: true
+  config:
+    description: "Path to config file or a directory containing notion-docs.yaml"
+    required: false
+    default: "."
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+
+    - name: Install dependencies
+      shell: bash
+      run: pip install -r notion-code-docs/requirements.txt
+
+    - name: Run Notion Docs Sync
+      shell: bash
+      env:
+        NOTION_API_KEY: ${{ inputs.notion-token }}
+      run: python main.py --config "${{ inputs.config }}"
