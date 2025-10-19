@@ -22,7 +22,7 @@ runs:
 
     - name: Install dependencies
       shell: bash
-      run: pip install -r notion-code-docs/requirements.txt
+      run: pip install -r requirements.txt
 
     - name: Run Notion Docs Sync
       shell: bash
