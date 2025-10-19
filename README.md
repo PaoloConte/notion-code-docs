@@ -141,7 +141,8 @@ where double spaces are used to indicate a line break; so it may be useful to di
 Prerequisites:
 - Prepare Notion as explained above.
 - Create the configuration file `notion-docs.yaml` in your project.
-- Add the key to your GitHub repository secrets as NOTION_API_KEY.
+- Add the key to your GitHub repository secrets (`NOTION_TOKEN` in the example below).
+- Set the configuration file path relative to the root of your project (default is `.`).
 - Add the action to your workflow.
 
 Example workflow:
