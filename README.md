@@ -79,6 +79,7 @@ Examples:
 - create a private Notion connection and get the API key
 - create a notion page and add the connection to it
 - get the page ID and set it in the config file
+- transform the page into a wiki
 - create properties `Subtree Hash` and `Text Hash`
 
 
