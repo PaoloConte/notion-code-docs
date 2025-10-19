@@ -2,11 +2,13 @@ import os
 import hashlib
 from typing import Iterator, List, Tuple, Dict, Set, Optional
 import re
+import logging
 
 from .models import BlockComment
 from .comments import extract_block_comments_from_text, parse_breadcrumb_and_strip
 from .mnemonic import compute_mnemonic
 
+logger = logging.getLogger(__name__)
 
 SUPPORTED_EXTENSIONS = {".java", ".kt", ".kts", ".php", ".md"}
 
@@ -72,26 +74,42 @@ def extract_block_comments_from_file(path: str) -> List[BlockComment]:
         _, e = os.path.splitext(p)
         l = ext_to_lang(e)
         entries = []
+        prev_bc: Optional[Tuple[str, ...]] = None
         for b in extract_block_comments_from_text(t, l):
             parsed = parse_breadcrumb_and_strip(b)
             if parsed is None:
                 continue
             bc, rem = parsed
+            # Handle NOTION.* placeholder by replacing with previous breadcrumb in the same file
+            if list(bc) == ["*"]:
+                if prev_bc is None:
+                    logger.error("Encountered NOTION.* with no previous tag in file %s; ignoring this comment", p)
+                    continue
+                bc = list(prev_bc)
             # Normalize breadcrumb by stripping any trailing #<num> from the last segment
             cleaned_bc, _ = _strip_sort_index(list(bc))
+            prev_bc = tuple(cleaned_bc)
             # Return raw remaining text; aggregation and hashing will be done globally per crumb
             entries.append((tuple(cleaned_bc), rem))
         return entries
 
     # First pass: collect NOTION comments in the requested file with text and text_hash only
     results: List[BlockComment] = []
+    prev_bc_main: Optional[Tuple[str, ...]] = None
     for body in extract_block_comments_from_text(text, lang):
         parsed = parse_breadcrumb_and_strip(body)
         if parsed is None:
             continue
         breadcrumb, remaining = parsed
+        # Handle NOTION.* placeholder by replacing with previous breadcrumb in the same file
+        if list(breadcrumb) == ["*"]:
+            if prev_bc_main is None:
+                logger.error("Encountered NOTION.* with no previous tag in file %s; ignoring this comment", path)
+                continue
+            breadcrumb = list(prev_bc_main)
         # Extract optional sort_index and clean breadcrumb
         cleaned_breadcrumb, sort_index = _strip_sort_index(list(breadcrumb))
+        prev_bc_main = tuple(cleaned_breadcrumb)
         text_hash = hashlib.sha256(remaining.encode("utf-8")).hexdigest()
         results.append(
             BlockComment(
