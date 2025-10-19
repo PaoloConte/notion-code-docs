@@ -21,6 +21,7 @@ class AppConfig:
     api_key: str
     titles_matching: str = "title_only"
     header: Optional[str] = None
+    include_file_in_header: bool = False
 
 
 def _load_yaml(path: str) -> Dict:
@@ -104,6 +105,15 @@ def load_config(path_or_dir: Optional[str] = None) -> AppConfig:
         if header_val == "":
             header_val = None
 
-    return AppConfig(root=root, root_page_id=root_page_id, api_key=api_key, titles_matching=titles_matching, header=header_val)
+    include_file_in_header = bool(data.get("include_file_in_header", False))
+
+    return AppConfig(
+        root=root,
+        root_page_id=root_page_id,
+        api_key=api_key,
+        titles_matching=titles_matching,
+        header=header_val,
+        include_file_in_header=include_file_in_header,
+    )
 
 

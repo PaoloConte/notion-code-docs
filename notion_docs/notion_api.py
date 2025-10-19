@@ -9,10 +9,11 @@ from .markdown_to_notion import markdown_to_blocks
 from .mnemonic import compute_mnemonic
 
 class NotionClient:
-    def __init__(self, api_key: str, titles_matching: str = "title_only", header: Optional[str] = None):
+    def __init__(self, api_key: str, titles_matching: str = "title_only", header: Optional[str] = None, include_files_in_header: bool = False):
         self.client = Client(auth=api_key)
         self.titles_matching = (titles_matching or "title_only").lower()
         self.header = (header or "").strip() or None
+        self.include_files_in_header = bool(include_files_in_header)
 
 
     def _markdown_to_blocks(self, md: str) -> List[dict]:
@@ -160,7 +161,7 @@ class NotionClient:
             },
         )
 
-    def replace_page_content(self, page_id: str, markdown_text: str) -> None:
+    def replace_page_content(self, page_id: str, markdown_text: str, source_files: Optional[List[str]] = None) -> None:
         # Remove existing non-page children, then append markdown-converted blocks via official API
         logger.info("Replacing content on %s using official Notion API (md length=%d)", page_id, len(markdown_text) if markdown_text else 0)
         removed = 0
@@ -184,23 +185,80 @@ class NotionClient:
             blocks = self._markdown_to_blocks(markdown_text)
             # Prepend header callout if configured
             if self.header:
+                header_text = self.header
+                header_rich: List[dict] = [
+                    {
+                        "type": "text",
+                        "text": {"content": header_text},
+                        "annotations": {
+                            "bold": False,
+                            "italic": False,
+                            "strikethrough": False,
+                            "underline": False,
+                            "code": False,
+                            "color": "default",
+                        },
+                    }
+                ]
+                if self.include_files_in_header and source_files:
+                    try:
+                        # Show only basenames, unique and sorted for stability
+                        import os
+                        names = sorted({os.path.basename(s) for s in source_files if s})
+                        if names:
+                            # Add a new line with label
+                            header_rich.append(
+                                {
+                                    "type": "text",
+                                    "text": {"content": "\n"},
+                                    "annotations": {
+                                        "bold": False,
+                                        "italic": False,
+                                        "strikethrough": False,
+                                        "underline": False,
+                                        "code": False,
+                                        "color": "default",
+                                    },
+                                }
+                            )
+                            # Add filenames as inline-code spans separated by comma+space
+                            for i, nm in enumerate(names):
+                                header_rich.append(
+                                    {
+                                        "type": "text",
+                                        "text": {"content": nm},
+                                        "annotations": {
+                                            "bold": False,
+                                            "italic": False,
+                                            "strikethrough": False,
+                                            "underline": False,
+                                            "code": True,
+                                            "color": "blue",
+                                        },
+                                    }
+                                )
+                                if i != len(names) - 1:
+                                    header_rich.append(
+                                        {
+                                            "type": "text",
+                                            "text": {"content": ", "},
+                                            "annotations": {
+                                                "bold": False,
+                                                "italic": False,
+                                                "strikethrough": False,
+                                                "underline": False,
+                                                "code": False,
+                                                "color": "default",
+                                            },
+                                        }
+                                    )
+                    except Exception:
+                        # Fail-safe: keep original header if anything goes wrong
+                        pass
                 header_block = {
                     "type": "callout",
                     "callout": {
-                        "rich_text": [
-                            {
-                                "type": "text",
-                                "text": {"content": self.header},
-                                "annotations": {
-                                    "bold": False,
-                                    "italic": False,
-                                    "strikethrough": False,
-                                    "underline": False,
-                                    "code": False,
-                                    "color": "default",
-                                },
-                            }
-                        ],
+                        "rich_text": header_rich,
                         "icon": {"type": "emoji", "emoji": "✨"},
                     },
                 }

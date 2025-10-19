@@ -16,6 +16,7 @@ class PageState:
     text: str
     text_hash: str
     subtree_hash: str
+    source_files: List[str]
 
 
 def _aggregate_comments(comments: List[BlockComment]) -> Dict[Tuple[str, ...], PageState]:
@@ -38,11 +39,15 @@ def _aggregate_comments(comments: List[BlockComment]) -> Dict[Tuple[str, ...], P
 
     # Prepare combined text for all crumbs; ancestors without direct comments get empty text
     combined_text: Dict[Tuple[str, ...], str] = {}
+    source_files_by_crumb: Dict[Tuple[str, ...], List[str]] = {}
     for crumb in all_crumbs_set:
         if crumb in by_crumb:
-            combined_text[crumb] = "\n\n".join(c.text for c in by_crumb[crumb])
+            lst = by_crumb[crumb]
+            combined_text[crumb] = "\n\n".join(c.text for c in lst)
+            source_files_by_crumb[crumb] = [c.file_path for c in lst]
         else:
             combined_text[crumb] = ""
+            source_files_by_crumb[crumb] = []
 
     combined_text_hash: Dict[Tuple[str, ...], str] = {
         crumb: hashlib.sha256(txt.encode("utf-8")).hexdigest()
@@ -63,7 +68,12 @@ def _aggregate_comments(comments: List[BlockComment]) -> Dict[Tuple[str, ...], P
 
     logger.info("Aggregated into %d breadcrumbs (including ancestors)", len(all_crumbs))
     return {
-        crumb: PageState(text=combined_text[crumb], text_hash=combined_text_hash[crumb], subtree_hash=subtree_hash[crumb])
+        crumb: PageState(
+            text=combined_text[crumb],
+            text_hash=combined_text_hash[crumb],
+            subtree_hash=subtree_hash[crumb],
+            source_files=source_files_by_crumb.get(crumb, []),
+        )
         for crumb in all_crumbs
     }
 
@@ -95,7 +105,12 @@ def sync_to_notion(config: AppConfig, comments: List[BlockComment], dry_run: boo
             logger.info("[DRY RUN] Would ensure page: %s", " / ".join(crumb))
         return
 
-    client = NotionClient(config.api_key, getattr(config, 'titles_matching', 'title_only'), getattr(config, 'header', None))
+    client = NotionClient(
+        config.api_key,
+        getattr(config, 'titles_matching', 'title_only'),
+        getattr(config, 'header', None),
+        getattr(config, 'include_file_in_header', False),
+    )
 
     # Build children mapping for top-down traversal
     children: Dict[Tuple[str, ...], List[Tuple[str, ...]]] = {}
@@ -130,7 +145,7 @@ def sync_to_notion(config: AppConfig, comments: List[BlockComment], dry_run: boo
         need_meta = force or (existing_text_hash != state.text_hash) or (existing_subtree_hash != state.subtree_hash)
         if need_content:
             logger.info("Updating content for page '%s' (id=%s)", " / ".join(crumb), page_id)
-            client.replace_page_content(page_id, state.text)
+            client.replace_page_content(page_id, state.text, state.source_files)
         else:
             logger.info("Content up-to-date for page '%s' (id=%s)", " / ".join(crumb), page_id)
         # Traverse children only if subtree hash changed, unless forcing
