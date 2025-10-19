@@ -142,7 +142,7 @@ Prerequisites:
 - Prepare Notion as explained above.
 - Create the configuration file `notion-docs.yaml` in your project.
 - Add the key to your GitHub repository secrets (`NOTION_TOKEN` in the example below).
-- Set the configuration file path relative to the root of your project (default is `.`).
+- Set the configuration file folder relative to the root of your project (default is `.`).
 - Add the action to your workflow.
 
 Example workflow:
