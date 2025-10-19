@@ -152,7 +152,7 @@ jobs:
   notion-docs:
     runs-on: ubuntu-latest
     steps:
-      - uses: PaoloConte/notion-code-docs
+      - uses: PaoloConte/notion-code-docs@v1
         with:
           notion-token: ${{ secrets.NOTION_TOKEN }}
           config: .
