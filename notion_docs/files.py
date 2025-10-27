@@ -79,7 +79,7 @@ def extract_block_comments_from_file(path: str) -> List[BlockComment]:
             parsed = parse_breadcrumb_and_strip(b)
             if parsed is None:
                 continue
-            bc, rem = parsed
+            bc, rem, opts = parsed
             # Handle NOTION.* placeholder by replacing with previous breadcrumb in the same file
             if list(bc) == ["*"]:
                 if prev_bc is None:
@@ -100,7 +100,7 @@ def extract_block_comments_from_file(path: str) -> List[BlockComment]:
         parsed = parse_breadcrumb_and_strip(body)
         if parsed is None:
             continue
-        breadcrumb, remaining = parsed
+        breadcrumb, remaining, options = parsed
         # Handle NOTION.* placeholder by replacing with previous breadcrumb in the same file
         if list(breadcrumb) == ["*"]:
             if prev_bc_main is None:
@@ -119,6 +119,7 @@ def extract_block_comments_from_file(path: str) -> List[BlockComment]:
                 sort_index=sort_index,
                 text_hash=text_hash,
                 subtree_hash="",
+                options=options,
             )
         )
 

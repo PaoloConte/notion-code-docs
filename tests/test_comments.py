@@ -90,15 +90,36 @@ def test_extract_block_comments_from_text_normalization():
 
 def test_parse_breadcrumb_and_strip():
     cases = [
-        ("NOTION.A.B.C Remaining text", (["A", "B", "C"], "Remaining text")),
-        ("NOTION.A Title\nBody", (["A", "Title"], "Body")),
-        ("NOTION.A.B C\nMore", (["A", "B C"], "More")),
-        ("NOTION.* Comment", (["*"], "Comment")),
+        ("NOTION.A.B.C Remaining text", (["A", "B", "C"], "Remaining text", {})),
+        ("NOTION.A Title\nBody", (["A", "Title"], "Body", {})),
+        ("NOTION.A.B C\nMore", (["A", "B C"], "More", {})),
+        ("NOTION.* Comment", (["*"], "Comment", {})),
         ("No prefix", None),
     ]
     for body, expected in cases:
         result = parse_breadcrumb_and_strip(body)
         assert result == expected
+
+
+def test_parse_breadcrumb_with_options():
+    """Test parsing NOTION tags with options in brackets."""
+    cases = [
+        # Single option
+        ("NOTION[include_all].A.B.C\nBody", (["A", "B", "C"], "Body", {"include_all": True})),
+        # Multiple options
+        ("NOTION[opt1,opt2].Page\nContent", (["Page"], "Content", {"opt1": True, "opt2": True})),
+        # Options with spaces
+        ("NOTION[opt1, opt2, opt3].A.B\nText", (["A", "B"], "Text", {"opt1": True, "opt2": True, "opt3": True})),
+        # Options with NOTION.* placeholder
+        ("NOTION[include_all].*\nContent", (["*"], "Content", {"include_all": True})),
+        # Empty options (edge case)
+        ("NOTION[].A.B\nText", (["A", "B"], "Text", {})),
+        # Options with inline comment
+        ("NOTION[opt1].* Inline comment", (["*"], "Inline comment", {"opt1": True})),
+    ]
+    for body, expected in cases:
+        result = parse_breadcrumb_and_strip(body)
+        assert result == expected, f"Failed for: {body}"
 
 
 

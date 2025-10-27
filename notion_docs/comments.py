@@ -1,5 +1,5 @@
 import re
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from pygments import lex
 from pygments.lexers import JavaLexer, KotlinLexer, PhpLexer
@@ -72,7 +72,7 @@ def _normalize_block_comment_text(raw: str) -> str:
 
     def is_breadcrumb_line(l: str) -> bool:
         ls = l.lstrip()
-        return ls.startswith("NOTION.") or ls.startswith("NOTION/")
+        return ls.startswith("NOTION.") or ls.startswith("NOTION/") or ls.startswith("NOTION[")
 
     should_star_strip = False
     if non_empty_lines:
@@ -111,7 +111,7 @@ def _normalize_block_comment_text(raw: str) -> str:
         lines.pop()
 
     # Ensure breadcrumb line is not indented: strip leading spaces/tabs if first line is NOTION.*
-    if lines and re.match(r"^\s*NOTION[\./]", lines[0]):
+    if lines and re.match(r"^\s*NOTION[\.\[/]", lines[0]):
         lines[0] = lines[0].lstrip(" \t")
         # If subsequent lines are visually aligned with the breadcrumb due to extra indentation,
         # remove their common leading whitespace equally.
@@ -162,13 +162,30 @@ def extract_block_comments_from_text(text: str, lang: str) -> List[str]:
     return bodies
 
 
-def parse_breadcrumb_and_strip(body: str) -> Optional[Tuple[List[str], str]]:
+def parse_breadcrumb_and_strip(body: str) -> Optional[Tuple[List[str], str, Dict[str, bool]]]:
     """Parse a NOTION.* breadcrumb at the start of body and strip it.
 
-    Returns a tuple (breadcrumb, remaining_text) if present, otherwise None.
+    Returns a tuple (breadcrumb, remaining_text, options) if present, otherwise None.
     Breadcrumb segments are split on '.' or '/' after the NOTION prefix and may
     include spaces or symbols as part of each segment. The delimiters are '.' and '/'.
+    Options can be specified in brackets: NOTION[option1,option2].page.path
     """
+    # Extract options from brackets if present (e.g., NOTION[include_all].page)
+    options: Dict[str, bool] = {}
+    if body.startswith("NOTION["):
+        # Find the closing bracket
+        closing_bracket = body.find("]")
+        if closing_bracket != -1:
+            # Extract options from within brackets
+            options_str = body[len("NOTION["):closing_bracket]
+            # Parse comma-separated options
+            for opt in options_str.split(","):
+                opt = opt.strip()
+                if opt:
+                    options[opt] = True
+            # Remove the bracket part from body
+            body = "NOTION" + body[closing_bracket + 1:]
+
     if not (body.startswith("NOTION.") or body.startswith("NOTION/")):
         return None
     # Determine token boundary:
@@ -225,6 +242,6 @@ def parse_breadcrumb_and_strip(body: str) -> Optional[Tuple[List[str], str]]:
             words = [w for w in re.split(r"\s+", segments_part) if w]
             if words:
                 rest = words[-1]
-    return (segments, rest)
+    return (segments, rest, options)
 
 

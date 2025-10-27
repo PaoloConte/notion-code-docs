@@ -1,5 +1,5 @@
-from dataclasses import dataclass
-from typing import List, Optional
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional
 
 
 @dataclass
@@ -13,5 +13,7 @@ class BlockComment:
     text_hash: str = ""
     # Hash including the breadcrumb hierarchy (represents the subtree identity)
     subtree_hash: str = ""
+    # Options extracted from tag, e.g., NOTION[option1,option2].page
+    options: Dict[str, bool] = field(default_factory=dict)
 
 
