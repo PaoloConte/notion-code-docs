@@ -162,3 +162,113 @@ def test_duplicate_breadcrumb_texts_get_appended(tmp_path):
     for c in comments_AB:
         assert c.subtree_hash == empty_hash
 
+
+def test_include_all_option_collects_subsequent_untagged_comments(tmp_path):
+    """Test that NOTION[include_all] collects non-tagged comments after it."""
+    root = Path(tmp_path)
+
+    # File with include_all tag followed by regular comments
+    write(
+        root / "A.kt",
+        """
+        /*
+         * NOTION[include_all].A
+         * Tagged content
+         */
+
+        /* Regular comment 1 */
+
+        /* Regular comment 2 */
+
+        /*
+         * NOTION.B
+         * Another tagged content
+         */
+
+        /* Regular comment 3 */
+        """.strip(),
+    )
+
+    discovered: List[str] = list(iter_source_files(str(root)))
+    all_comments = []
+    for p in discovered:
+        all_comments.extend(extract_block_comments_from_file(p))
+
+    # Should have two comments: A and B
+    assert len(all_comments) == 2
+
+    # Find A and B comments
+    comment_A = next(c for c in all_comments if tuple(c.breadcrumb) == ("A",))
+    comment_B = next(c for c in all_comments if tuple(c.breadcrumb) == ("B",))
+
+    # A should include the tagged content plus the two regular comments after it
+    assert "Tagged content" in comment_A.text
+    assert "Regular comment 1" in comment_A.text
+    assert "Regular comment 2" in comment_A.text
+    assert "Regular comment 3" not in comment_A.text  # This comes after B
+
+    # B should only have its own content (no include_all)
+    assert comment_B.text == "Another tagged content"
+    assert "Regular comment 3" not in comment_B.text
+
+    # Verify options are set correctly
+    assert comment_A.options == {"include_all": True}
+    assert comment_B.options == {}
+
+
+def test_include_all_with_multiple_tags(tmp_path):
+    """Test include_all with multiple tags in the same file."""
+    root = Path(tmp_path)
+
+    write(
+        root / "A.kt",
+        """
+        /*
+         * NOTION[include_all].A
+         * Content A
+         */
+
+        /* Comment for A */
+
+        /*
+         * NOTION[include_all].B
+         * Content B
+         */
+
+        /* Comment for B */
+
+        /*
+         * NOTION.C
+         * Content C
+         */
+
+        /* Comment after C */
+        """.strip(),
+    )
+
+    discovered: List[str] = list(iter_source_files(str(root)))
+    all_comments = []
+    for p in discovered:
+        all_comments.extend(extract_block_comments_from_file(p))
+
+    # Should have three comments: A, B, C
+    assert len(all_comments) == 3
+
+    comment_A = next(c for c in all_comments if tuple(c.breadcrumb) == ("A",))
+    comment_B = next(c for c in all_comments if tuple(c.breadcrumb) == ("B",))
+    comment_C = next(c for c in all_comments if tuple(c.breadcrumb) == ("C",))
+
+    # A should include its comment
+    assert "Content A" in comment_A.text
+    assert "Comment for A" in comment_A.text
+    assert "Comment for B" not in comment_A.text
+
+    # B should include its comment
+    assert "Content B" in comment_B.text
+    assert "Comment for B" in comment_B.text
+    assert "Comment after C" not in comment_B.text
+
+    # C should NOT include the comment after it (no include_all)
+    assert comment_C.text == "Content C"
+    assert "Comment after C" not in comment_C.text
+

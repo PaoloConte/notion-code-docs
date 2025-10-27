@@ -94,12 +94,25 @@ def extract_block_comments_from_file(path: str) -> List[BlockComment]:
         return entries
 
     # First pass: collect NOTION comments in the requested file with text and text_hash only
+    # Track which result is currently collecting non-tagged comments (for include_all option)
+    all_bodies = extract_block_comments_from_text(text, lang)
     results: List[BlockComment] = []
     prev_bc_main: Optional[Tuple[str, ...]] = None
-    for body in extract_block_comments_from_text(text, lang):
+    current_collector_idx: Optional[int] = None  # Index of result with include_all that's collecting
+
+    for body in all_bodies:
         parsed = parse_breadcrumb_and_strip(body)
+
         if parsed is None:
+            # This is a non-tagged comment
+            if current_collector_idx is not None:
+                # Append to the current collector
+                results[current_collector_idx].text += "\n" + body
             continue
+
+        # This is a tagged comment - stop collecting for the previous tag
+        current_collector_idx = None
+
         breadcrumb, remaining, options = parsed
         # Handle NOTION.* placeholder by replacing with previous breadcrumb in the same file
         if list(breadcrumb) == ["*"]:
@@ -110,6 +123,7 @@ def extract_block_comments_from_file(path: str) -> List[BlockComment]:
         # Extract optional sort_index and clean breadcrumb
         cleaned_breadcrumb, sort_index = _strip_sort_index(list(breadcrumb))
         prev_bc_main = tuple(cleaned_breadcrumb)
+
         text_hash = hashlib.sha256(remaining.encode("utf-8")).hexdigest()
         results.append(
             BlockComment(
@@ -122,6 +136,15 @@ def extract_block_comments_from_file(path: str) -> List[BlockComment]:
                 options=options,
             )
         )
+
+        # If this tag has include_all, mark it as the current collector
+        if options.get("include_all"):
+            current_collector_idx = len(results) - 1
+
+    # Recompute text_hash for any results that collected additional comments
+    for result in results:
+        if result.options.get("include_all"):
+            result.text_hash = hashlib.sha256(result.text.encode("utf-8")).hexdigest()
 
     # Build a global map of crumb -> concatenated text across all files under the same directory as `path`
     base_dir = os.path.dirname(path)

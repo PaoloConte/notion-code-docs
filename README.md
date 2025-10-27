@@ -23,11 +23,43 @@ The first comment will generate a page named `Application` with the text "This a
 With the second comment, a page `Functions` will be created inside the `Application` page, containing the text 
 `This is a comment` and a list with two items.
 
-It's possible to use both `.` and `/` as separators in the tag. Additionally, the notation `NOTION.*` will 
-use the previous tag *in the same file*, so to not repeat it in following comments.  
+It's possible to use both `.` and `/` as separators in the tag. Additionally, the notation `NOTION.*` will
+use the previous tag *in the same file*, so to not repeat it in following comments.
 Adding a pound symbol (`#`) and a number at the end of the tag will be used to sort multiple comments on the same page.
-For example, `NOTION.Application#1` will be the first comment on the page; comments without a number will be sorted after 
+For example, `NOTION.Application#1` will be the first comment on the page; comments without a number will be sorted after
 comments with a number.
+
+## Tag Options
+You can add options to NOTION tags using bracket notation: `NOTION[option1,option2].Page.Path`.
+
+### Available Options
+
+#### `include_all`
+The `include_all` option automatically collects all non-tagged block comments that appear after the tagged comment and appends them to the page content.
+
+Example:
+```kotlin
+/* NOTION[include_all].Application
+ * Main application description
+ */
+
+/* Implementation details that we want to include */
+
+/* More notes about the implementation */
+
+/* NOTION.OtherPage
+ * This is a separate page
+ */
+
+/* This comment won't be included in Application */
+```
+
+In this example, the `Application` page will contain:
+- "Main application description"
+- "Implementation details that we want to include"
+- "More notes about the implementation"
+
+The `OtherPage` will only contain "This is a separate page" (since it doesn't have the `include_all` option).
 
 # Supported languages
 - Kotlin
