@@ -64,6 +64,8 @@ fun main() {
      * Text
      */
      
+     /* NOTION.A.B  Comment 123 */
+     
 }
 """
 
@@ -71,7 +73,7 @@ fun main() {
 def test_extract_block_comments_from_text_normalization():
     bodies = extract_block_comments_from_text(SAMPLE_KOTLIN, lang="kotlin")
 
-    assert len(bodies) == 11
+    assert len(bodies) == 12
     assert bodies[0] == "COMMENT 1"
     assert bodies[1] == "COMMENT 2"
     assert bodies[2] == "COMMENT 3\n - indented"
@@ -83,6 +85,7 @@ def test_extract_block_comments_from_text_normalization():
     assert bodies[8] == "NOTION.INT.DPL\n### Aligned\n\nText"
     assert bodies[9] == "NOTION.INT.DPL\n### Aligned\n\nText"
     assert bodies[10] == "NOTION.INT.DPL\n### Title\n\nText"
+    assert bodies[11] == "NOTION.A.B  Comment 123"
 
 
 def test_parse_breadcrumb_and_strip():
@@ -90,6 +93,7 @@ def test_parse_breadcrumb_and_strip():
         ("NOTION.A.B.C Remaining text", (["A", "B", "C"], "Remaining text")),
         ("NOTION.A Title\nBody", (["A", "Title"], "Body")),
         ("NOTION.A.B C\nMore", (["A", "B C"], "More")),
+        ("NOTION.* Comment", (["*"], "Comment")),
         ("No prefix", None),
     ]
     for body, expected in cases:

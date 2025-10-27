@@ -201,19 +201,30 @@ def parse_breadcrumb_and_strip(body: str) -> Optional[Tuple[List[str], str]]:
     segments_part = token[len("NOTION")+1:]
     # Split on both '.' and '/'
     segments = [p for p in re.split(r"[\./]", segments_part) if p] if segments_part else []
-    # Special case: if no '.' or '/' was present (single segment), allow splitting by whitespace
-    if len(segments) == 1:
-        only = segments[0].strip()
-        if only:
-            # Split on any run of whitespace
-            parts = [p for p in re.split(r"\s+", only) if p]
-            segments = parts
-    # If there is no remaining text and the token contained spaces, emit the last
-    # whitespace-delimited word as remaining text to preserve trailing label like "C"
-    if not rest and (" " in segments_part or "\t" in segments_part):
-        words = [w for w in re.split(r"\s+", segments_part) if w]
-        if words:
-            rest = words[-1]
+    # Special case: Check if this is NOTION.* or NOTION/* with text after
+    # If so, only keep "*" as the segment and move the rest to comment text
+    if segments_part.strip() == "*" or (segments_part.startswith("* ") or segments_part.startswith("*\t")):
+        segments = ["*"]
+        # Everything after "* " becomes rest
+        idx = segments_part.find("*")
+        if idx != -1 and idx + 1 < len(segments_part):
+            after_star = segments_part[idx + 1:].lstrip(" \t")
+            if after_star:
+                rest = after_star if not rest else after_star + "\n" + rest
+    else:
+        # Special case: if no '.' or '/' was present (single segment), allow splitting by whitespace
+        if len(segments) == 1:
+            only = segments[0].strip()
+            if only:
+                # Split on any run of whitespace
+                parts = [p for p in re.split(r"\s+", only) if p]
+                segments = parts
+        # If there is no remaining text and the token contained spaces, emit the last
+        # whitespace-delimited word as remaining text to preserve trailing label like "C"
+        if not rest and (" " in segments_part or "\t" in segments_part):
+            words = [w for w in re.split(r"\s+", segments_part) if w]
+            if words:
+                rest = words[-1]
     return (segments, rest)
 
 
