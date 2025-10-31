@@ -163,12 +163,6 @@ python3 main.py --config ~/code/my-project
 python3 main.py --config . --force -v
 ```
 
-# Notes
-- Some IDEs, such as IntelliJ, may strip spaces at the end of lines; this interferes with markdown parsing 
-where double spaces are used to indicate a line break; so it may be useful to disable this feature.
-- Pay attention to the indentation of the comments, all lines should be aligned
-
-
 ## Using the GitHub Action
 Prerequisites:
 - Prepare Notion as explained above.
@@ -193,3 +187,9 @@ jobs:
           notion-token: ${{ secrets.NOTION_TOKEN }}
           config: .
 ```
+
+
+# Notes
+- Some IDEs, such as IntelliJ, may strip spaces at the end of lines; this interferes with markdown parsing
+  where double spaces are used to indicate a line break; so it may be useful to disable this feature.
+- Pay attention to the indentation of the comments, all lines should be aligned
