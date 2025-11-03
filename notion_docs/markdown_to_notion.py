@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 def markdown_to_blocks(md: str) -> List[dict]:
     """Convert Markdown to Notion blocks using a structured Markdown parser (markdown-it-py).
-    Supported blocks: headings (h1–h3), paragraphs, bulleted lists, fenced code, simple tables.
+    Supported blocks: headings (h1–h3), paragraphs, blockquotes, bulleted lists, fenced code, simple tables.
     Supported inline: bold, italic, inline code.
     """
     md = md or ""
@@ -175,6 +175,37 @@ def markdown_to_blocks(md: str) -> List[dict]:
             content = rich_from_inline(inline) if inline else []
             blocks.append({"type": "paragraph", "paragraph": {"rich_text": content}})
             i += 3
+            continue
+
+        if tok.type == "blockquote_open":
+            # Blockquotes can contain multiple paragraphs and other blocks
+            # We'll collect all inline content within the blockquote and combine them
+            i += 1
+            quote_content: List[dict] = []
+            while i < len(tokens) and tokens[i].type != "blockquote_close":
+                if tokens[i].type == "paragraph_open":
+                    inline = tokens[i + 1] if i + 1 < len(tokens) and tokens[i + 1].type == "inline" else None
+                    if inline:
+                        # Add paragraph content to quote
+                        paragraph_content = rich_from_inline(inline)
+                        if quote_content and paragraph_content:
+                            # Add a newline between paragraphs within the quote
+                            quote_content.append({
+                                "type": "text",
+                                "text": {"content": "\n"},
+                                "annotations": make_annotations(),
+                            })
+                        quote_content.extend(paragraph_content)
+                    i += 3  # skip paragraph_open, inline, paragraph_close
+                else:
+                    i += 1
+            # Add the complete quote block
+            blocks.append({
+                "type": "quote",
+                "quote": {"rich_text": quote_content if quote_content else []},
+            })
+            # consume blockquote_close
+            i += 1
             continue
 
         if tok.type == "bullet_list_open":
