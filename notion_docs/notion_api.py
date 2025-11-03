@@ -262,7 +262,12 @@ class NotionClient:
                         "icon": {"type": "emoji", "emoji": "✨"},
                     },
                 }
-                blocks = [header_block] + blocks
+                # Add an empty paragraph after the callout when files are included
+                empty_paragraph = {
+                    "type": "paragraph",
+                    "paragraph": {"rich_text": []},
+                }
+                blocks = [header_block, empty_paragraph] + blocks
             logger.info("Appending %d blocks to %s", len(blocks), page_id)
             # Append sequentially to properly handle table blocks (need to append rows under the created table)
             appended = 0
