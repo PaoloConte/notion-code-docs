@@ -90,10 +90,11 @@ def test_extract_block_comments_from_text_normalization():
 
 def test_parse_breadcrumb_and_strip():
     cases = [
-        ("NOTION.A.B.C Remaining text", (["A", "B", "C"], "Remaining text", {})),
-        ("NOTION.A Title\nBody", (["A", "Title"], "Body", {})),
+        ("NOTION.A.B.C Remaining text", (["A", "B", "C Remaining text"], "", {})),
+        ("NOTION.A Title\nBody", (["A Title"], "Body", {})),
         ("NOTION.A.B C\nMore", (["A", "B C"], "More", {})),
         ("NOTION.* Comment", (["*"], "Comment", {})),
+        ("NOTION.* Comment\nAnd text", (["*"], "Comment\nAnd text", {})),
         ("No prefix", None),
     ]
     for body, expected in cases:

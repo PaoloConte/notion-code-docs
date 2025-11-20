@@ -71,7 +71,7 @@ def test_iter_and_extract_only_notion(tmp_path):
     assert text_hash_A == hashlib.sha256(text_A.encode("utf-8")).hexdigest()
 
     text_BC, text_hash_BC, subtree_hash_BC = by_crumb[("A", "B C")]
-    assert text_BC == "C"
+    assert text_BC == ""
     assert text_hash_BC == hashlib.sha256(text_BC.encode("utf-8")).hexdigest()
 
     # New subtree hash semantics: subtree hash is SHA-256 of newline-joined text hashes of strict descendants (excluding self)

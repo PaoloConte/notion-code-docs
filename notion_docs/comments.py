@@ -188,23 +188,15 @@ def parse_breadcrumb_and_strip(body: str) -> Optional[Tuple[List[str], str, Dict
 
     if not (body.startswith("NOTION.") or body.startswith("NOTION/")):
         return None
+        
     # Determine token boundary:
-    # - If a newline exists, the token runs until the newline (spaces allowed inside segments)
-    # - Otherwise (single-line), the token runs until the first space/tab (if any)
+    # - If a newline exists, the token runs until the newline.
+    # - Otherwise, the token is the entire string.
     idx_nl = body.find("\n")
     if idx_nl != -1:
         token_end = idx_nl
     else:
-        # Single-line: decide if the first space separates breadcrumb from body.
-        first_space = body.find(" ")
-        if first_space == -1:
-            token_end = len(body)
-        else:
-            tail = body[first_space+1:].strip()
-            if (" " in tail) or ("\t" in tail):
-                token_end = first_space
-            else:
-                token_end = len(body)
+        token_end = len(body)
 
     token = body[:token_end]
     rest = body[token_end:]
@@ -228,20 +220,6 @@ def parse_breadcrumb_and_strip(body: str) -> Optional[Tuple[List[str], str, Dict
             after_star = segments_part[idx + 1:].lstrip(" \t")
             if after_star:
                 rest = after_star if not rest else after_star + "\n" + rest
-    else:
-        # Special case: if no '.' or '/' was present (single segment), allow splitting by whitespace
-        if len(segments) == 1:
-            only = segments[0].strip()
-            if only:
-                # Split on any run of whitespace
-                parts = [p for p in re.split(r"\s+", only) if p]
-                segments = parts
-        # If there is no remaining text and the token contained spaces, emit the last
-        # whitespace-delimited word as remaining text to preserve trailing label like "C"
-        if not rest and (" " in segments_part or "\t" in segments_part):
-            words = [w for w in re.split(r"\s+", segments_part) if w]
-            if words:
-                rest = words[-1]
     return (segments, rest, options)
 
 
