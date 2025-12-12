@@ -9,23 +9,28 @@ import re
 logger = logging.getLogger(__name__)
 
 
-def markdown_to_blocks(md: str) -> List[dict]:
+def markdown_to_blocks(md: str, quote_color: str = "default", inline_code_color: str = "default") -> List[dict]:
     """Convert Markdown to Notion blocks using a structured Markdown parser (markdown-it-py).
     Supported blocks: headings (h1–h3), paragraphs, blockquotes, bulleted lists, fenced code, simple tables.
     Supported inline: bold, italic, inline code.
+
+    Args:
+        md: Markdown text to convert
+        quote_color: Notion color for quote blocks (default: "default")
+        inline_code_color: Notion color for inline code (default: "default")
     """
     md = md or ""
     md_parser = MarkdownIt("commonmark").enable('table')
     tokens: List[Token] = md_parser.parse(md)
 
-    def make_annotations(*, bold: bool = False, italic: bool = False, code: bool = False) -> dict:
+    def make_annotations(*, bold: bool = False, italic: bool = False, code: bool = False, color: str = "default") -> dict:
         return {
             "bold": bool(bold),
             "italic": bool(italic),
             "strikethrough": False,
             "underline": False,
             "code": bool(code),
-            "color": "default",
+            "color": color,
         }
 
     def is_notion_url(url: Optional[str]) -> bool:
@@ -106,7 +111,7 @@ def markdown_to_blocks(md: str) -> List[dict]:
                                 "type": "page",
                                 "page": {"id": page_id},
                             },
-                            "annotations": make_annotations(code=True),
+                            "annotations": make_annotations(code=True, color=inline_code_color),
                             "plain_text": t.content,
                             "href": current_link,
                         })
@@ -117,7 +122,7 @@ def markdown_to_blocks(md: str) -> List[dict]:
                 segments.append({
                     "type": "text",
                     "text": text_obj,
-                    "annotations": make_annotations(code=True),
+                    "annotations": make_annotations(code=True, color=inline_code_color),
                 })
             elif t.type == "strong_open":
                 flush_buf()
@@ -193,16 +198,23 @@ def markdown_to_blocks(md: str) -> List[dict]:
                             quote_content.append({
                                 "type": "text",
                                 "text": {"content": "\n"},
-                                "annotations": make_annotations(),
+                                "annotations": make_annotations(color=quote_color),
                             })
                         quote_content.extend(paragraph_content)
                     i += 3  # skip paragraph_open, inline, paragraph_close
                 else:
                     i += 1
-            # Add the complete quote block
+            # Apply quote_color to all rich text segments in the quote
+            for segment in quote_content:
+                if "annotations" in segment:
+                    segment["annotations"]["color"] = quote_color
+            # Add the complete quote block with color property for the bar
             blocks.append({
                 "type": "quote",
-                "quote": {"rich_text": quote_content if quote_content else []},
+                "quote": {
+                    "rich_text": quote_content if quote_content else [],
+                    "color": quote_color,
+                },
             })
             # consume blockquote_close
             i += 1

@@ -22,6 +22,8 @@ class AppConfig:
     titles_matching: str = "title_only"
     header: Optional[str] = None
     include_file_in_header: bool = False
+    quote_color: str = "default"
+    inline_code_color: str = "default"
 
 
 def _load_yaml(path: str) -> Dict:
@@ -107,6 +109,26 @@ def load_config(path_or_dir: Optional[str] = None) -> AppConfig:
 
     include_file_in_header = bool(data.get("include_file_in_header", False))
 
+    # Color settings for formatting
+    quote_color = str(data.get("quote_color", "default")).strip().lower()
+    inline_code_color = str(data.get("inline_code_color", "default")).strip().lower()
+
+    # Valid Notion colors
+    valid_colors = {
+        "default", "gray", "brown", "orange", "yellow", "green", "blue",
+        "purple", "pink", "red", "gray_background", "brown_background",
+        "orange_background", "yellow_background", "green_background",
+        "blue_background", "purple_background", "pink_background", "red_background"
+    }
+
+    if quote_color not in valid_colors:
+        logger.warning(f"Invalid quote_color '{quote_color}', using 'default'")
+        quote_color = "default"
+
+    if inline_code_color not in valid_colors:
+        logger.warning(f"Invalid inline_code_color '{inline_code_color}', using 'default'")
+        inline_code_color = "default"
+
     return AppConfig(
         root=root,
         root_page_id=root_page_id,
@@ -114,6 +136,8 @@ def load_config(path_or_dir: Optional[str] = None) -> AppConfig:
         titles_matching=titles_matching,
         header=header_val,
         include_file_in_header=include_file_in_header,
+        quote_color=quote_color,
+        inline_code_color=inline_code_color,
     )
 
 

@@ -110,6 +110,8 @@ def sync_to_notion(config: AppConfig, comments: List[BlockComment], dry_run: boo
         getattr(config, 'titles_matching', 'title_only'),
         getattr(config, 'header', None),
         getattr(config, 'include_file_in_header', False),
+        getattr(config, 'quote_color', 'default'),
+        getattr(config, 'inline_code_color', 'default'),
     )
 
     # Build children mapping for top-down traversal

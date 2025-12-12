@@ -9,16 +9,18 @@ from .markdown_to_notion import markdown_to_blocks
 from .mnemonic import compute_mnemonic
 
 class NotionClient:
-    def __init__(self, api_key: str, titles_matching: str = "title_only", header: Optional[str] = None, include_files_in_header: bool = False):
+    def __init__(self, api_key: str, titles_matching: str = "title_only", header: Optional[str] = None, include_files_in_header: bool = False, quote_color: str = "default", inline_code_color: str = "default"):
         self.client = Client(auth=api_key)
         self.titles_matching = (titles_matching or "title_only").lower()
         self.header = (header or "").strip() or None
         self.include_files_in_header = bool(include_files_in_header)
+        self.quote_color = quote_color
+        self.inline_code_color = inline_code_color
 
 
     def _markdown_to_blocks(self, md: str) -> List[dict]:
         """Delegate markdown conversion to the dedicated converter module."""
-        return markdown_to_blocks(md)
+        return markdown_to_blocks(md, quote_color=self.quote_color, inline_code_color=self.inline_code_color)
 
     def _append_nested_blocks(self, parent_block_id: str, children: List[dict]) -> None:
         """Recursively append nested blocks to a parent block.
