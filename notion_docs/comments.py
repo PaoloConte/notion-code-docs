@@ -67,8 +67,8 @@ def _normalize_block_comment_text(raw: str) -> str:
     non_empty_lines = [l for l in lines if l.strip() != ""]
 
     def is_star_line(l: str) -> bool:
-        # Consider lines that start with '*' or with a single leading space/tab before '*'
-        return bool(re.match(r"^[ \t]?\*", l))
+        # Consider lines that start with '*' optionally preceded by whitespace
+        return bool(re.match(r"^[ \t]*\*", l))
 
     def is_breadcrumb_line(l: str) -> bool:
         ls = l.lstrip()
@@ -91,15 +91,11 @@ def _normalize_block_comment_text(raw: str) -> str:
     if should_star_strip:
         new_lines: List[str] = []
         for l in lines:
-            if l.startswith("*"):
-                l = l[1:]
-                if l.startswith(" "):
-                    l = l[1:]
-            elif l.startswith(" *"):
-                # Remove a single leading space/tab before '*', then behave like above
-                l = l[2:]
-                if l.startswith(" "):
-                    l = l[1:]
+            # Strip any leading whitespace, then '*', then optionally one space
+            m = re.match(r'^[ \t]*\*( ?)', l)
+            if m:
+                # Remove the matched part (whitespace + * + optional space)
+                l = l[len(m.group(0)):]
             new_lines.append(l)
         lines = new_lines
         lines = trim_common_indent(lines)
