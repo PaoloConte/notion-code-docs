@@ -209,30 +209,54 @@ def markdown_to_blocks(md: str) -> List[dict]:
             continue
 
         if tok.type == "bullet_list_open":
-            # iterate list items until bullet_list_close
+            # Process list items, handling nested lists recursively
+            def process_list_item(start_idx: int) -> tuple[dict, int]:
+                """Process a single list item and return (block, next_index).
+                Handles nested lists by adding them as children."""
+                # start_idx points to list_item_open
+                j = start_idx + 1
+                inline = None
+                nested_children = []
+
+                # Scan through the list item to find inline content and nested lists
+                while j < len(tokens) and tokens[j].type != "list_item_close":
+                    if tokens[j].type == "inline" and inline is None:
+                        # Capture the first inline content for this item
+                        inline = tokens[j]
+                        j += 1
+                    elif tokens[j].type == "bullet_list_open":
+                        # Found a nested list - process it recursively
+                        j += 1  # move past bullet_list_open
+                        while j < len(tokens) and tokens[j].type != "bullet_list_close":
+                            if tokens[j].type == "list_item_open":
+                                nested_block, j = process_list_item(j)
+                                nested_children.append(nested_block)
+                            else:
+                                j += 1
+                        j += 1  # consume bullet_list_close
+                    else:
+                        j += 1
+
+                # Build the list item block
+                content = rich_from_inline(inline) if inline else []
+                item_block = {
+                    "type": "bulleted_list_item",
+                    "bulleted_list_item": {"rich_text": content},
+                }
+
+                # Add nested children if any
+                if nested_children:
+                    item_block["children"] = nested_children
+
+                # j should now be at list_item_close
+                return item_block, j + 1  # return next index after list_item_close
+
+            # Process all top-level list items
             i += 1
             while i < len(tokens) and tokens[i].type != "bullet_list_close":
                 if tokens[i].type == "list_item_open":
-                    # structure: list_item_open, paragraph_open, inline, paragraph_close, list_item_close
-                    # or list_item_open, inline? handle flexibly
-                    # find the first inline inside the list item
-                    j = i + 1
-                    inline = None
-                    while j < len(tokens) and tokens[j].type != "list_item_close":
-                        if tokens[j].type == "inline":
-                            inline = tokens[j]
-                            break
-                        j += 1
-                    content = rich_from_inline(inline) if inline else []
-                    blocks.append({
-                        "type": "bulleted_list_item",
-                        "bulleted_list_item": {"rich_text": content},
-                    })
-                    # advance to list_item_close
-                    while i < len(tokens) and tokens[i].type != "list_item_close":
-                        i += 1
-                    # consume list_item_close
-                    i += 1
+                    item_block, i = process_list_item(i)
+                    blocks.append(item_block)
                 else:
                     i += 1
             # consume bullet_list_close

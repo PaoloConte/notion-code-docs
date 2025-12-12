@@ -20,6 +20,23 @@ class NotionClient:
         """Delegate markdown conversion to the dedicated converter module."""
         return markdown_to_blocks(md)
 
+    def _append_nested_blocks(self, parent_block_id: str, children: List[dict]) -> None:
+        """Recursively append nested blocks to a parent block.
+        Handles nested list items by extracting their children and appending separately."""
+        for child_block in children:
+            child_type = child_block.get("type")
+            # Extract nested children if any (for list items)
+            nested_children = child_block.pop("children", None)
+
+            # Append the child block without its children
+            resp = self.client.blocks.children.append(block_id=parent_block_id, children=[child_block])
+
+            # If there are nested children, recursively append them
+            if nested_children:
+                created_block_id = resp.get("results", [{}])[0].get("id")
+                if created_block_id:
+                    self._append_nested_blocks(created_block_id, nested_children)
+
     def list_children(self, parent_block_id: str, page_size: int = 100) -> List[dict]:
         logger.info("Listing children for parent %s", parent_block_id)
         results: List[dict] = []
@@ -291,6 +308,17 @@ class NotionClient:
                     # Append table with its rows in a single request
                     self.client.blocks.children.append(block_id=page_id, children=[block])
                     appended += 1
+                elif btype == "bulleted_list_item":
+                    # Handle nested list items: extract children and append separately
+                    nested_children = block.pop("children", None)
+                    # Append the parent list item without children
+                    resp = self.client.blocks.children.append(block_id=page_id, children=[block])
+                    appended += 1
+                    # If there are nested children, append them to the newly created block
+                    if nested_children:
+                        created_block_id = resp.get("results", [{}])[0].get("id")
+                        if created_block_id:
+                            self._append_nested_blocks(created_block_id, nested_children)
                 else:
                     # Append non-table blocks directly
                     self.client.blocks.children.append(block_id=page_id, children=[block])
