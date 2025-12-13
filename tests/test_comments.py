@@ -104,6 +104,10 @@ def test_parse_breadcrumb_and_strip():
         ("NOTION.* Comment", (["*"], "Comment", {})),
         ("NOTION.* Comment\nAnd text", (["*"], "Comment\nAnd text", {})),
         ("No prefix", None),
+        # Breadcrumb parts should be trimmed of whitespace
+        ("NOTION.A. B .C\nBody", (["A", "B", "C"], "Body", {})),
+        ("NOTION. A . B\nContent", (["A", "B"], "Content", {})),
+        ("NOTION.A.\tB\t.C\nMore", (["A", "B", "C"], "More", {})),
     ]
     for body, expected in cases:
         result = parse_breadcrumb_and_strip(body)
@@ -125,6 +129,8 @@ def test_parse_breadcrumb_with_options():
         ("NOTION[].A.B\nText", (["A", "B"], "Text", {})),
         # Options with inline comment
         ("NOTION[opt1].* Inline comment", (["*"], "Inline comment", {"opt1": True})),
+        # Options with trimmed breadcrumb parts
+        ("NOTION[opt1]. A . B . C\nText", (["A", "B", "C"], "Text", {"opt1": True})),
     ]
     for body, expected in cases:
         result = parse_breadcrumb_and_strip(body)

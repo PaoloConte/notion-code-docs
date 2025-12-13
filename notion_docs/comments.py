@@ -204,8 +204,8 @@ def parse_breadcrumb_and_strip(body: str) -> Optional[Tuple[List[str], str, Dict
     if sep not in (".", "/"):
         sep = "."
     segments_part = token[len("NOTION")+1:]
-    # Split on both '.' and '/'
-    segments = [p for p in re.split(r"[\./]", segments_part) if p] if segments_part else []
+    # Split on both '.' and '/' and trim whitespace from each segment
+    segments = [p.strip() for p in re.split(r"[\./]", segments_part) if p.strip()] if segments_part else []
     # Special case: Check if this is NOTION.* or NOTION/* with text after
     # If so, only keep "*" as the segment and move the rest to comment text
     if segments_part.strip() == "*" or (segments_part.startswith("* ") or segments_part.startswith("*\t")):
