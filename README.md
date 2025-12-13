@@ -199,6 +199,7 @@ jobs:
 
 
 # Notes
+- The script NEVER deletes pages from Notion. If a page becomes empty, you should delete it manually.
 - Some IDEs, such as IntelliJ, may strip spaces at the end of lines; this interferes with markdown parsing
   where double spaces are used to indicate a line break; so it may be useful to disable this feature.
 - Pay attention to the indentation of the comments, all lines should be aligned
