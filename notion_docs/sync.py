@@ -43,7 +43,7 @@ def _aggregate_comments(comments: List[BlockComment]) -> Dict[Tuple[str, ...], P
     for crumb in all_crumbs_set:
         if crumb in by_crumb:
             lst = by_crumb[crumb]
-            combined_text[crumb] = "\n".join(c.text for c in lst)
+            combined_text[crumb] = "\n\n".join(c.text for c in lst)
             source_files_by_crumb[crumb] = [c.file_path for c in lst]
         else:
             combined_text[crumb] = ""
