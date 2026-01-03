@@ -26,8 +26,8 @@ With the second comment, a page `Functions` will be created inside the `Applicat
 It's possible to use both `.` and `/` as separators in the tag. Additionally, the notation `NOTION.*` will
 use the previous tag *in the same file*, so to not repeat it in following comments.
 Adding a pound symbol (`#`) and a number at the end of the tag will be used to sort multiple comments on the same page.
-For example, `NOTION.Application#1` will be the first comment on the page; comments without a number will be sorted after
-comments with a number.
+Comments without a number default to sort index `1000`, so you can use numbers lower than 1000 to appear before default comments,
+or higher than 1000 to appear after. For example, `NOTION.Application#1` will appear first, `NOTION.Application#2000` will appear last.
 
 ## Tag Options
 You can add options to NOTION tags using bracket notation: `NOTION[option1,option2].Page.Path`.
