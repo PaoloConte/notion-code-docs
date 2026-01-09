@@ -122,6 +122,17 @@ def sync_to_notion(config: AppConfig, comments: List[BlockComment], dry_run: boo
     for k in children.keys():
         children[k].sort()
 
+    # Compute root subtree hash (hash of all top-level pages' subtree hashes)
+    top_level_crumbs = sorted(children.get(tuple(), []))
+    root_subtree_data = "\n".join(pages[crumb].subtree_hash for crumb in top_level_crumbs)
+    root_subtree_hash = hashlib.sha256(root_subtree_data.encode("utf-8")).hexdigest()
+
+    # Check root page hash first - skip everything if unchanged
+    existing_root_text_hash, existing_root_subtree_hash = client.get_metadata(config.root_page_id)
+    if not force and existing_root_subtree_hash == root_subtree_hash:
+        logger.info("Root subtree unchanged, nothing to do")
+        return
+
     ensured: Dict[Tuple[str, ...], str] = {tuple(): config.root_page_id}
 
     def ensure_page(parent_id: str, crumb: Tuple[str, ...]) -> str:
@@ -176,7 +187,11 @@ def sync_to_notion(config: AppConfig, comments: List[BlockComment], dry_run: boo
             logger.info("Metadata up-to-date for page '%s' (id=%s)", " / ".join(crumb), page_id)
 
     # Start from top-level crumbs under the configured root
-    for top in sorted(children.get(tuple(), [])):
+    for top in top_level_crumbs:
         process_node(config.root_page_id, top)
+
+    # Update root page metadata
+    logger.info("Updating root page metadata")
+    client.set_metadata(config.root_page_id, "", root_subtree_hash)
 
     logger.info("Sync to Notion completed for %d pages", len(pages))
