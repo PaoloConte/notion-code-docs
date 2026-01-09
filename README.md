@@ -29,6 +29,13 @@ Adding a pound symbol (`#`) and a number at the end of the tag will be used to s
 Comments without a number default to sort index `1000`, so you can use numbers lower than 1000 to appear before default comments,
 or higher than 1000 to appear after. For example, `NOTION.Application#1` will appear first, `NOTION.Application#2000` will appear last.
 
+# Supported languages
+- Kotlin
+- Java
+- PHP
+- Plain MD files
+
+
 ## Tag Options
 You can add options to NOTION tags using bracket notation: `NOTION[option1,option2].Page.Path`.
 
@@ -60,12 +67,6 @@ In this example, the `Application` page will contain:
 - "More notes about the implementation"
 
 The `OtherPage` will only contain "This is a separate page" (since it doesn't have the `include_all` option).
-
-# Supported languages
-- Kotlin
-- Java
-- PHP
-- Plain MD files
 
 # Configuration
 Use a config file named `notion-docs.yaml` (or `notion-docs.yml`).
