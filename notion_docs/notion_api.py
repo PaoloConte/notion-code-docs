@@ -200,93 +200,100 @@ class NotionClient:
             page_id,
         )
         # Build new content blocks and append
+        blocks: List[dict] = []
         if markdown_text:
             blocks = self._markdown_to_blocks(markdown_text)
-            # Prepend header callout if configured
-            if self.header:
-                header_text = self.header
-                header_rich: List[dict] = [
-                    {
-                        "type": "text",
-                        "text": {"content": header_text},
-                        "annotations": {
-                            "bold": False,
-                            "italic": False,
-                            "strikethrough": False,
-                            "underline": False,
-                            "code": False,
-                            "color": "default",
-                        },
-                    }
-                ]
-                if self.include_files_in_header and source_files:
-                    try:
-                        # Show only basenames, unique and sorted for stability
-                        import os
-                        names = sorted({os.path.basename(s) for s in source_files if s})
-                        if names:
-                            # Add a new line with label
+        # Prepend header callout if configured and there's content
+        if markdown_text and self.header:
+            header_text = self.header
+            header_rich: List[dict] = [
+                {
+                    "type": "text",
+                    "text": {"content": header_text},
+                    "annotations": {
+                        "bold": False,
+                        "italic": False,
+                        "strikethrough": False,
+                        "underline": False,
+                        "code": False,
+                        "color": "default",
+                    },
+                }
+            ]
+            if self.include_files_in_header and source_files:
+                try:
+                    # Show only basenames, unique and sorted for stability
+                    import os
+                    names = sorted({os.path.basename(s) for s in source_files if s})
+                    if names:
+                        # Add a new line with label
+                        header_rich.append(
+                            {
+                                "type": "text",
+                                "text": {"content": "\n"},
+                                "annotations": {
+                                    "bold": False,
+                                    "italic": False,
+                                    "strikethrough": False,
+                                    "underline": False,
+                                    "code": False,
+                                    "color": "default",
+                                },
+                            }
+                        )
+                        # Add filenames as inline-code spans separated by comma+space
+                        for i, nm in enumerate(names):
                             header_rich.append(
                                 {
                                     "type": "text",
-                                    "text": {"content": "\n"},
+                                    "text": {"content": nm},
                                     "annotations": {
                                         "bold": False,
                                         "italic": False,
                                         "strikethrough": False,
                                         "underline": False,
-                                        "code": False,
-                                        "color": "default",
+                                        "code": True,
+                                        "color": "blue",
                                     },
                                 }
                             )
-                            # Add filenames as inline-code spans separated by comma+space
-                            for i, nm in enumerate(names):
+                            if i != len(names) - 1:
                                 header_rich.append(
                                     {
                                         "type": "text",
-                                        "text": {"content": nm},
+                                        "text": {"content": ", "},
                                         "annotations": {
                                             "bold": False,
                                             "italic": False,
                                             "strikethrough": False,
                                             "underline": False,
-                                            "code": True,
-                                            "color": "blue",
+                                            "code": False,
+                                            "color": "default",
                                         },
                                     }
                                 )
-                                if i != len(names) - 1:
-                                    header_rich.append(
-                                        {
-                                            "type": "text",
-                                            "text": {"content": ", "},
-                                            "annotations": {
-                                                "bold": False,
-                                                "italic": False,
-                                                "strikethrough": False,
-                                                "underline": False,
-                                                "code": False,
-                                                "color": "default",
-                                            },
-                                        }
-                                    )
-                    except Exception:
-                        # Fail-safe: keep original header if anything goes wrong
-                        pass
-                header_block = {
-                    "type": "callout",
-                    "callout": {
-                        "rich_text": header_rich,
-                        "icon": {"type": "emoji", "emoji": "✨"},
-                    },
-                }
-                # Add an empty paragraph after the callout when files are included
+                except Exception:
+                    # Fail-safe: keep original header if anything goes wrong
+                    pass
+            header_block = {
+                "type": "callout",
+                "callout": {
+                    "rich_text": header_rich,
+                    "icon": {"type": "emoji", "emoji": "✨"},
+                },
+            }
+            # Add an empty paragraph after the callout only if next block is not a heading
+            first_block_type = blocks[0].get("type") if blocks else None
+            if first_block_type in {"heading_1", "heading_2", "heading_3"}:
+                blocks = [header_block] + blocks
+            else:
                 empty_paragraph = {
                     "type": "paragraph",
                     "paragraph": {"rich_text": []},
                 }
                 blocks = [header_block, empty_paragraph] + blocks
+        # Append blocks if there are any
+        if blocks:
             logger.info("Appending %d blocks to %s", len(blocks), page_id)
             # Append sequentially to properly handle table blocks (need to append rows under the created table)
             appended = 0

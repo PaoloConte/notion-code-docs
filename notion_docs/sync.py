@@ -141,6 +141,7 @@ def sync_to_notion(config: AppConfig, comments: List[BlockComment], dry_run: boo
             page_id = ensure_page(parent_id, crumb)
             ensured[crumb] = page_id
         state = pages[crumb]
+
         # Update current page content first
         existing_text_hash, existing_subtree_hash = client.get_metadata(page_id)
         need_content = force or (existing_text_hash != state.text_hash)
