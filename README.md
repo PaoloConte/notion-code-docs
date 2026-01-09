@@ -85,7 +85,6 @@ inline_code_color: blue
 - (optional) `titles_matching` is the title matching strategy (all are case-insensitive). Possible values are:
   - (default) `title_only` : matches the exact title of the page
   - `prefix`: matches only if the page title starts with the indicated prefix; symbols are ignored; useful if pages have a numbering or coding scheme.
-  - `mnemonic`: matches only if the provided segment equals the computed mnemonic of the page title (see algorithm below); In the case of multiple sibling pages with same mnemonic, the behavior is undefined.
 - (optional) `quote_color` is the color to apply to blockquote blocks (both the text and the vertical bar). Default is `default`.
 - (optional) `inline_code_color` is the color to apply to inline code segments. Default is `default`.
 
@@ -95,27 +94,6 @@ Valid color values for `quote_color` and `inline_code_color`:
 - **Background colors**: `gray_background`, `brown_background`, `orange_background`, `yellow_background`, `green_background`, `blue_background`, `purple_background`, `pink_background`, `red_background`
 
 Plus set an environment variable `NOTION_API_KEY` with the API key of your Notion connection.
-
-
-### Mnemonic
-To address pages, as an alternative to the exact page title, it's possible to use a mnemonic with a standardized format.
-Here is how it is calculated:
-- Ignore spaces and symbols.
-- Three uppercase letters or numbers.
-- The first letter of the code is the first letter of the title.
-- The following two characters are the next to consonants of the word.
-- If not enough consonants are available, use the vowels starting from the beginning.
-- If the title is to short, the missing characters are replaced with `X`.
-
-Examples:
-- "Alpha Beta Gamma" → ALP
-- "Echo" → ECH
-- "why" → WHY
-- "Idea 123" → IDE
-- "A1" → A1X
-- "C# Sharp Developer" → CSH
-- "123abc" → 1BC
-- "!!!" → XXX
 
 
 # Notion Setup
