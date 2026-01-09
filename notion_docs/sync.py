@@ -142,13 +142,20 @@ def sync_to_notion(config: AppConfig, comments: List[BlockComment], dry_run: boo
             ensured[crumb] = page_id
         state = pages[crumb]
 
-        # Update current page content first
+        # Ensure all child pages exist FIRST (so they appear at the top)
+        child_crumbs = children.get(crumb, [])
+        for child_crumb in child_crumbs:
+            if child_crumb not in ensured:
+                child_id = ensure_page(page_id, child_crumb)
+                ensured[child_crumb] = child_id
+
+        # Update current page content
         existing_text_hash, existing_subtree_hash = client.get_metadata(page_id)
         need_content = force or (existing_text_hash != state.text_hash)
         need_meta = force or (existing_text_hash != state.text_hash) or (existing_subtree_hash != state.subtree_hash)
         if need_content:
             logger.info("Updating content for page '%s' (id=%s)", " / ".join(crumb), page_id)
-            client.replace_page_content(page_id, state.text, state.source_files)
+            client.replace_page_content(page_id, state.text, state.source_files, has_children=bool(child_crumbs))
         else:
             logger.info("Content up-to-date for page '%s' (id=%s)", " / ".join(crumb), page_id)
         # Traverse children only if subtree hash changed, unless forcing
@@ -157,7 +164,7 @@ def sync_to_notion(config: AppConfig, comments: List[BlockComment], dry_run: boo
                 logger.info("Force enabled; processing all subpages for '%s' (id=%s)", " / ".join(crumb), page_id)
             else:
                 logger.info("Subtree changed for page '%s' (id=%s); processing subpages", " / ".join(crumb), page_id)
-            for child_crumb in children.get(crumb, []):
+            for child_crumb in child_crumbs:
                 process_node(page_id, child_crumb)
         else:
             logger.info("Subtree unchanged for page '%s' (id=%s); skipping checks/ensures for subpages", " / ".join(crumb), page_id)

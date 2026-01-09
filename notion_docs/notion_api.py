@@ -180,9 +180,9 @@ class NotionClient:
             },
         )
 
-    def replace_page_content(self, page_id: str, markdown_text: str, source_files: Optional[List[str]] = None) -> None:
+    def replace_page_content(self, page_id: str, markdown_text: str, source_files: Optional[List[str]] = None, has_children: bool = False) -> None:
         # Remove existing non-page children, then append markdown-converted blocks via official API
-        logger.info("Replacing content on %s using official Notion API (md length=%d)", page_id, len(markdown_text) if markdown_text else 0)
+        logger.info("Replacing content on %s (md length=%d)", page_id, len(markdown_text) if markdown_text else 0)
         removed = 0
         skipped_child_pages = 0
         for blk in self.list_children(page_id):
@@ -292,6 +292,17 @@ class NotionClient:
                     "paragraph": {"rich_text": []},
                 }
                 blocks = [header_block, empty_paragraph] + blocks
+        # Add empty paragraph and divider at the very start to separate from child pages above
+        if has_children and blocks:
+            separator = {
+                "type": "paragraph",
+                "paragraph": {"rich_text": []},
+            }
+            divider = {
+                "type": "divider",
+                "divider": {},
+            }
+            blocks = [divider, separator] + blocks
         # Append blocks if there are any
         if blocks:
             logger.info("Appending %d blocks to %s", len(blocks), page_id)
