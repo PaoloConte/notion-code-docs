@@ -152,21 +152,37 @@ def sync_to_notion(config: AppConfig, comments: List[BlockComment], dry_run: boo
             page_id = ensure_page(parent_id, crumb)
             ensured[crumb] = page_id
         state = pages[crumb]
-
-        # Ensure all child pages exist FIRST (so they appear at the top)
         child_crumbs = children.get(crumb, [])
+
+        # Check which child pages need to be created (don't exist yet)
+        new_children = []
         for child_crumb in child_crumbs:
             if child_crumb not in ensured:
-                child_id = ensure_page(page_id, child_crumb)
-                ensured[child_crumb] = child_id
+                title = child_crumb[-1]
+                existing_id = client.find_child_page(page_id, title)
+                if existing_id:
+                    ensured[child_crumb] = existing_id
+                else:
+                    new_children.append(child_crumb)
 
-        # Update current page content
+        # Check if we need to update content
         existing_text_hash, existing_subtree_hash = client.get_metadata(page_id)
-        need_content = force or (existing_text_hash != state.text_hash)
+        need_content = force or (existing_text_hash != state.text_hash) or bool(new_children)
         need_meta = force or (existing_text_hash != state.text_hash) or (existing_subtree_hash != state.subtree_hash)
+
+        # Clear content FIRST, then create child pages, then append content
+        # This ensures new child pages appear at the top (after existing child pages)
         if need_content:
             logger.info("Updating content for page '%s' (id=%s)", " / ".join(crumb), page_id)
-            client.replace_page_content(page_id, state.text, state.source_files, has_children=bool(child_crumbs))
+            existing_children = client.clear_page_content(page_id)
+            has_children = existing_children > 0 or bool(child_crumbs)
+            # Now create new child pages (they will appear after existing child pages)
+            for child_crumb in new_children:
+                title = child_crumb[-1]
+                child_id = client.create_child_page(page_id, title)
+                ensured[child_crumb] = child_id
+            # Append content after child pages
+            client.append_page_content(page_id, state.text, state.source_files, has_children=has_children)
         else:
             logger.info("Content up-to-date for page '%s' (id=%s)", " / ".join(crumb), page_id)
         # Traverse children only if subtree hash changed, unless forcing

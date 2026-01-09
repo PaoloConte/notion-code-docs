@@ -180,25 +180,25 @@ class NotionClient:
             },
         )
 
-    def replace_page_content(self, page_id: str, markdown_text: str, source_files: Optional[List[str]] = None, has_children: bool = False) -> None:
-        # Remove existing non-page children, then append markdown-converted blocks via official API
-        logger.info("Replacing content on %s (md length=%d)", page_id, len(markdown_text) if markdown_text else 0)
+    def clear_page_content(self, page_id: str) -> int:
+        """Remove all non-child-page blocks from a page. Returns count of child pages found."""
+        logger.info("Clearing content from %s", page_id)
         removed = 0
-        skipped_child_pages = 0
+        child_pages = 0
         for blk in self.list_children(page_id):
             btype = blk.get("type")
             # Do NOT delete child pages or child databases; only remove content blocks
             if btype in {"child_page", "child_database"}:
-                skipped_child_pages += 1
+                child_pages += 1
                 continue
             self.client.blocks.delete(block_id=blk["id"])  # archive block
             removed += 1
-        logger.info(
-            "Removed %d blocks (skipped %d child pages/databases) from %s",
-            removed,
-            skipped_child_pages,
-            page_id,
-        )
+        logger.info("Removed %d blocks (found %d child pages) from %s", removed, child_pages, page_id)
+        return child_pages
+
+    def append_page_content(self, page_id: str, markdown_text: str, source_files: Optional[List[str]] = None, has_children: bool = False) -> None:
+        """Append content blocks to a page."""
+        logger.info("Appending content to %s (md length=%d)", page_id, len(markdown_text) if markdown_text else 0)
         # Build new content blocks and append
         blocks: List[dict] = []
         if markdown_text:
