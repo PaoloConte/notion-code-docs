@@ -1,5 +1,5 @@
 import logging
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Dict, Literal
 from notion_client import Client
 
 logger = logging.getLogger(__name__)
@@ -16,7 +16,57 @@ class NotionClient:
         self.include_files_in_header = bool(include_files_in_header)
         self.quote_color = quote_color
         self.inline_code_color = inline_code_color
+        # Cache for parent type detection (page vs database)
+        self._parent_type_cache: Dict[str, Literal["page", "database"]] = {}
+        # Cache for database title property names
+        self._db_title_property_cache: Dict[str, str] = {}
 
+    def _detect_parent_type(self, parent_id: str) -> Literal["page", "database"]:
+        """Detect if a parent ID is a page or database by trying to retrieve it."""
+        if parent_id in self._parent_type_cache:
+            return self._parent_type_cache[parent_id]
+
+        # Try to retrieve as a page first
+        try:
+            self.client.pages.retrieve(page_id=parent_id)
+            self._parent_type_cache[parent_id] = "page"
+            logger.info("Detected %s as a page", parent_id)
+            return "page"
+        except Exception as e:
+            error_msg = str(e)
+            if "database" in error_msg.lower():
+                # It's a database
+                self._parent_type_cache[parent_id] = "database"
+                logger.info("Detected %s as a database", parent_id)
+                return "database"
+            else:
+                # Unknown error, assume page and let it fail downstream
+                logger.warning("Could not detect type for %s: %s, assuming page", parent_id, e)
+                self._parent_type_cache[parent_id] = "page"
+                return "page"
+
+    def _get_database_title_property(self, database_id: str) -> str:
+        """Get the name of the title property for a database."""
+        if database_id in self._db_title_property_cache:
+            return self._db_title_property_cache[database_id]
+
+        try:
+            db = self.client.databases.retrieve(database_id=database_id)
+            properties = db.get("properties", {})
+            # Find the property with type "title"
+            for prop_name, prop_data in properties.items():
+                if prop_data.get("type") == "title":
+                    logger.info("Found title property '%s' for database %s", prop_name, database_id)
+                    self._db_title_property_cache[database_id] = prop_name
+                    return prop_name
+            # Fallback to "Name" if no title property found (shouldn't happen)
+            logger.warning("No title property found for database %s, using 'Name'", database_id)
+            self._db_title_property_cache[database_id] = "Name"
+            return "Name"
+        except Exception as e:
+            logger.warning("Failed to retrieve database %s: %s, using 'Name' as title property", database_id, e)
+            self._db_title_property_cache[database_id] = "Name"
+            return "Name"
 
     def _markdown_to_blocks(self, md: str) -> List[dict]:
         """Delegate markdown conversion to the dedicated converter module."""
@@ -54,6 +104,7 @@ class NotionClient:
 
     def find_child_page(self, parent_page_id: str, segment: str) -> Optional[str]:
         # For a page parent, the child pages appear as child_page blocks under the page's block children
+        # For a database parent, we need to query the database
         logger.info("Searching for child page matching segment '%s' under %s (mode=%s)", segment, parent_page_id, self.titles_matching)
 
         def norm(s: Optional[str]) -> str:
@@ -68,57 +119,131 @@ class NotionClient:
         seg_upper = seg.upper()
         seg_norm = norm(seg)
 
-        for blk in self.list_children(parent_page_id):
-            if blk.get("type") != "child_page":
-                continue
-            child = blk.get("child_page", {})
-            title = child.get("title") or ""
-            page_id = blk.get("id")
+        # Detect if parent is a database
+        parent_type = self._detect_parent_type(parent_page_id)
 
-            mode = self.titles_matching
+        if parent_type == "database":
+            # Query database for pages
+            try:
+                title_property = self._get_database_title_property(parent_page_id)
+                # Query all pages in the database (Notion doesn't support case-insensitive filtering)
+                resp = self.client.databases.query(database_id=parent_page_id, page_size=100)
+                pages = resp.get("results", [])
 
-            if mode == "title_only":
-                # Only exact case-insensitive title match
-                if title.casefold() == seg_cf:
-                    logger.info("Found child page by exact title '%s' (case-insensitive) with id %s", title, page_id)
-                    return page_id
-            elif mode == "mnemonic":
-                # Match only if segment equals computed mnemonic (no exact title fallback)
-                page_mn = compute_mnemonic(title)
-                if page_mn == seg_upper:
-                    logger.info("Found child page by computed mnemonic '%s' (title='%s') with id %s", page_mn, title, page_id)
-                    return page_id
-            elif mode == "prefix":
-                # Match only if normalized title starts with normalized segment (symbols ignored, case-insensitive)
-                # Do not match when the normalized segment equals the full normalized title (i.e., exact title)
-                title_norm = norm(title)
-                if seg_norm and title_norm.startswith(seg_norm) and title_norm != seg_norm:
-                    logger.info("Found child page by prefix match: segment '%s' matches title '%s' (id=%s)", segment, title, page_id)
-                    return page_id
-            else:
-                # Unknown mode: fallback to exact only behavior
-                if title.casefold() == seg_cf:
-                    logger.info("Found child page by exact title '%s' (case-insensitive, unknown mode) with id %s", title, page_id)
-                    return page_id
+                # Manually filter pages by title
+                for page in pages:
+                    props = page.get("properties", {})
+                    title_prop = props.get(title_property, {})
+                    if title_prop.get("type") == "title":
+                        title_parts = title_prop.get("title", [])
+                        title = "".join(part.get("plain_text", "") for part in title_parts)
+                        page_id = page.get("id")
 
-        logger.info("Child page for segment '%s' not found under %s", segment, parent_page_id)
-        return None
+                        mode = self.titles_matching
+
+                        if mode == "title_only":
+                            if title.casefold() == seg_cf:
+                                logger.info("Found database page by exact title '%s' (case-insensitive) with id %s", title, page_id)
+                                return page_id
+                        elif mode == "mnemonic":
+                            page_mn = compute_mnemonic(title)
+                            if page_mn == seg_upper:
+                                logger.info("Found database page by computed mnemonic '%s' (title='%s') with id %s", page_mn, title, page_id)
+                                return page_id
+                        elif mode == "prefix":
+                            title_norm = norm(title)
+                            if seg_norm and title_norm.startswith(seg_norm) and title_norm != seg_norm:
+                                logger.info("Found database page by prefix match: segment '%s' matches title '%s' (id=%s)", segment, title, page_id)
+                                return page_id
+                        else:
+                            if title.casefold() == seg_cf:
+                                logger.info("Found database page by exact title '%s' (case-insensitive, unknown mode) with id %s", title, page_id)
+                                return page_id
+
+                logger.info("Database page for segment '%s' not found in %s", segment, parent_page_id)
+                return None
+            except Exception as e:
+                logger.warning("Failed to query database %s: %s", parent_page_id, e)
+                return None
+        else:
+            # Normal page parent - list child blocks
+            for blk in self.list_children(parent_page_id):
+                if blk.get("type") != "child_page":
+                    continue
+                child = blk.get("child_page", {})
+                title = child.get("title") or ""
+                page_id = blk.get("id")
+
+                mode = self.titles_matching
+
+                if mode == "title_only":
+                    # Only exact case-insensitive title match
+                    if title.casefold() == seg_cf:
+                        logger.info("Found child page by exact title '%s' (case-insensitive) with id %s", title, page_id)
+                        return page_id
+                elif mode == "mnemonic":
+                    # Match only if segment equals computed mnemonic (no exact title fallback)
+                    page_mn = compute_mnemonic(title)
+                    if page_mn == seg_upper:
+                        logger.info("Found child page by computed mnemonic '%s' (title='%s') with id %s", page_mn, title, page_id)
+                        return page_id
+                elif mode == "prefix":
+                    # Match only if normalized title starts with normalized segment (symbols ignored, case-insensitive)
+                    # Do not match when the normalized segment equals the full normalized title (i.e., exact title)
+                    title_norm = norm(title)
+                    if seg_norm and title_norm.startswith(seg_norm) and title_norm != seg_norm:
+                        logger.info("Found child page by prefix match: segment '%s' matches title '%s' (id=%s)", segment, title, page_id)
+                        return page_id
+                else:
+                    # Unknown mode: fallback to exact only behavior
+                    if title.casefold() == seg_cf:
+                        logger.info("Found child page by exact title '%s' (case-insensitive, unknown mode) with id %s", title, page_id)
+                        return page_id
+
+            logger.info("Child page for segment '%s' not found under %s", segment, parent_page_id)
+            return None
 
     def create_child_page(self, parent_page_id: str, title: str) -> str:
         logger.info("Creating child page '%s' under %s", title, parent_page_id)
-        resp = self.client.pages.create(
-            parent={"type": "page_id", "page_id": parent_page_id},
-            properties={
-                "title": [
-                    {
-                        "type": "text",
-                        "text": {"content": title}
+
+        # Detect if parent is a page or database
+        parent_type = self._detect_parent_type(parent_page_id)
+
+        if parent_type == "database":
+            # Creating a page in a database requires database_id parent type
+            # and the title in the database's title property
+            title_property = self._get_database_title_property(parent_page_id)
+            resp = self.client.pages.create(
+                parent={"type": "database_id", "database_id": parent_page_id},
+                properties={
+                    title_property: {
+                        "title": [
+                            {
+                                "type": "text",
+                                "text": {"content": title}
+                            }
+                        ]
                     }
-                ]
-            },  # set page title
-            icon=None,
-            cover=None,
-        )
+                },
+                icon=None,
+                cover=None,
+            )
+        else:
+            # Creating a page under a page (normal case)
+            resp = self.client.pages.create(
+                parent={"type": "page_id", "page_id": parent_page_id},
+                properties={
+                    "title": [
+                        {
+                            "type": "text",
+                            "text": {"content": title}
+                        }
+                    ]
+                },
+                icon=None,
+                cover=None,
+            )
+
         # The returned page has an "id"
         new_id = resp["id"]
         logger.info("Created page '%s' with id %s", title, new_id)
