@@ -163,22 +163,28 @@ class NotionClient:
             # If properties cannot be read, surface absence
             return None, None
 
-    def set_metadata(self, page_id: str, text_hash: str, subtree_hash: str) -> None:
+    def set_metadata(self, page_id: str, text_hash: str, subtree_hash: str, ignore_errors: bool = False) -> None:
         """Write metadata via Notion page properties only."""
         logger.info("Setting metadata on %s", page_id)
-        self.client.pages.update(
-            page_id=page_id,
-            properties={
-                "Text Hash": {
-                    "type": "rich_text",
-                    "rich_text": [{"type": "text", "text": {"content": text_hash}}],
+        try:
+            self.client.pages.update(
+                page_id=page_id,
+                properties={
+                    "Text Hash": {
+                        "type": "rich_text",
+                        "rich_text": [{"type": "text", "text": {"content": text_hash}}],
+                    },
+                    "Subtree Hash": {
+                        "type": "rich_text",
+                        "rich_text": [{"type": "text", "text": {"content": subtree_hash}}],
+                    },
                 },
-                "Subtree Hash": {
-                    "type": "rich_text",
-                    "rich_text": [{"type": "text", "text": {"content": subtree_hash}}],
-                },
-            },
-        )
+            )
+        except Exception as e:
+            if ignore_errors:
+                logger.warning("Failed to set metadata on %s (ignored): %s", page_id, e)
+            else:
+                raise
 
     def clear_page_content(self, page_id: str) -> int:
         """Remove all non-child-page blocks from a page. Returns count of child pages found."""

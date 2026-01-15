@@ -208,6 +208,6 @@ def sync_to_notion(config: AppConfig, comments: List[BlockComment], dry_run: boo
 
     # Update root page metadata
     logger.info("Updating root page metadata")
-    client.set_metadata(config.root_page_id, "", root_subtree_hash)
+    client.set_metadata(config.root_page_id, "", root_subtree_hash, ignore_errors=True)
 
     logger.info("Sync to Notion completed for %d pages", len(pages))
