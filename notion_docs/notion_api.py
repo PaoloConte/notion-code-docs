@@ -53,14 +53,16 @@ class NotionClient:
         try:
             db = self.client.databases.retrieve(database_id=database_id)
             properties = db.get("properties", {})
+            logger.debug("Database %s properties: %s", database_id, list(properties.keys()))
             # Find the property with type "title"
             for prop_name, prop_data in properties.items():
+                logger.debug("Property '%s' has type '%s'", prop_name, prop_data.get("type"))
                 if prop_data.get("type") == "title":
                     logger.info("Found title property '%s' for database %s", prop_name, database_id)
                     self._db_title_property_cache[database_id] = prop_name
                     return prop_name
             # Fallback to "Name" if no title property found (shouldn't happen)
-            logger.warning("No title property found for database %s, using 'Name'", database_id)
+            logger.warning("No title property found for database %s (available: %s), using 'Name'", database_id, list(properties.keys()))
             self._db_title_property_cache[database_id] = "Name"
             return "Name"
         except Exception as e:
@@ -127,8 +129,15 @@ class NotionClient:
             try:
                 title_property = self._get_database_title_property(parent_page_id)
                 # Query all pages in the database (Notion doesn't support case-insensitive filtering)
-                resp = self.client.databases.query(database_id=parent_page_id, page_size=100)
+                # Note: databases.query might not exist in all versions, so we catch AttributeError
+                try:
+                    resp = self.client.databases.query(database_id=parent_page_id, page_size=100)
+                except AttributeError:
+                    logger.warning("Database query method not available, cannot search for existing pages in database %s", parent_page_id)
+                    return None
+
                 pages = resp.get("results", [])
+                logger.debug("Found %d pages in database %s", len(pages), parent_page_id)
 
                 # Manually filter pages by title
                 for page in pages:
@@ -213,21 +222,49 @@ class NotionClient:
             # Creating a page in a database requires database_id parent type
             # and the title in the database's title property
             title_property = self._get_database_title_property(parent_page_id)
-            resp = self.client.pages.create(
-                parent={"type": "database_id", "database_id": parent_page_id},
-                properties={
-                    title_property: {
-                        "title": [
-                            {
-                                "type": "text",
-                                "text": {"content": title}
+
+            # Try to create with the detected title property, fallback to common names if it fails
+            title_properties_to_try = [title_property]
+            if title_property not in ["Name", "Title", "Page"]:
+                title_properties_to_try.extend(["Name", "Title", "Page"])
+
+            last_error = None
+            for prop_name in title_properties_to_try:
+                try:
+                    logger.debug("Trying to create database page with title property '%s'", prop_name)
+                    resp = self.client.pages.create(
+                        parent={"type": "database_id", "database_id": parent_page_id},
+                        properties={
+                            prop_name: {
+                                "title": [
+                                    {
+                                        "type": "text",
+                                        "text": {"content": title}
+                                    }
+                                ]
                             }
-                        ]
-                    }
-                },
-                icon=None,
-                cover=None,
-            )
+                        },
+                        icon=None,
+                        cover=None,
+                    )
+                    # If successful, cache this as the correct property name
+                    self._db_title_property_cache[parent_page_id] = prop_name
+                    logger.info("Successfully created database page with title property '%s'", prop_name)
+                    new_id = resp["id"]
+                    logger.info("Created page '%s' with id %s", title, new_id)
+                    return new_id
+                except Exception as e:
+                    error_msg = str(e)
+                    if "not a property" in error_msg.lower():
+                        logger.debug("Property '%s' does not exist, trying next option", prop_name)
+                        last_error = e
+                        continue
+                    else:
+                        # Some other error, re-raise it
+                        raise
+
+            # If we get here, none of the property names worked
+            raise last_error if last_error else Exception(f"Could not create page in database {parent_page_id}")
         else:
             # Creating a page under a page (normal case)
             resp = self.client.pages.create(
@@ -243,11 +280,10 @@ class NotionClient:
                 icon=None,
                 cover=None,
             )
-
-        # The returned page has an "id"
-        new_id = resp["id"]
-        logger.info("Created page '%s' with id %s", title, new_id)
-        return new_id
+            # The returned page has an "id"
+            new_id = resp["id"]
+            logger.info("Created page '%s' with id %s", title, new_id)
+            return new_id
 
     def get_metadata(self, page_id: str) -> Tuple[Optional[str], Optional[str]]:
         """Read metadata hashes from Notion page properties.
