@@ -45,8 +45,9 @@ class NotionClient:
                 self._parent_type_cache[parent_id] = "page"
                 return "page"
 
-    def _get_database_title_property(self, database_id: str) -> str:
-        """Get the name of the title property for a database."""
+    def _get_database_title_property(self, database_id: str) -> Optional[str]:
+        """Get the name of the title property for a database.
+        Returns None if the database has no properties (e.g., wiki databases)."""
         if database_id in self._db_title_property_cache:
             return self._db_title_property_cache[database_id]
 
@@ -54,6 +55,13 @@ class NotionClient:
             db = self.client.databases.retrieve(database_id=database_id)
             properties = db.get("properties", {})
             logger.debug("Database %s properties: %s", database_id, list(properties.keys()))
+
+            # If database has no properties (wiki databases), return None
+            if not properties:
+                logger.info("Database %s has no properties (wiki database), pages will be created without property schema", database_id)
+                self._db_title_property_cache[database_id] = None
+                return None
+
             # Find the property with type "title"
             for prop_name, prop_data in properties.items():
                 logger.debug("Property '%s' has type '%s'", prop_name, prop_data.get("type"))
@@ -61,14 +69,14 @@ class NotionClient:
                     logger.info("Found title property '%s' for database %s", prop_name, database_id)
                     self._db_title_property_cache[database_id] = prop_name
                     return prop_name
-            # Fallback to "Name" if no title property found (shouldn't happen)
-            logger.warning("No title property found for database %s (available: %s), using 'Name'", database_id, list(properties.keys()))
-            self._db_title_property_cache[database_id] = "Name"
-            return "Name"
+            # No title property found but database has properties
+            logger.warning("No title property found for database %s (available: %s)", database_id, list(properties.keys()))
+            self._db_title_property_cache[database_id] = None
+            return None
         except Exception as e:
-            logger.warning("Failed to retrieve database %s: %s, using 'Name' as title property", database_id, e)
-            self._db_title_property_cache[database_id] = "Name"
-            return "Name"
+            logger.warning("Failed to retrieve database %s: %s", database_id, e)
+            self._db_title_property_cache[database_id] = None
+            return None
 
     def _markdown_to_blocks(self, md: str) -> List[dict]:
         """Delegate markdown conversion to the dedicated converter module."""
@@ -128,6 +136,7 @@ class NotionClient:
             # Query database for pages
             try:
                 title_property = self._get_database_title_property(parent_page_id)
+
                 # Query all pages in the database (Notion doesn't support case-insensitive filtering)
                 # Note: databases.query might not exist in all versions, so we catch AttributeError
                 try:
@@ -142,7 +151,11 @@ class NotionClient:
                 # Manually filter pages by title
                 for page in pages:
                     props = page.get("properties", {})
-                    title_prop = props.get(title_property, {})
+
+                    # For wiki databases with no schema, use "title" property
+                    prop_name_to_check = title_property if title_property else "title"
+                    title_prop = props.get(prop_name_to_check, {})
+
                     if title_prop.get("type") == "title":
                         title_parts = title_prop.get("title", [])
                         title = "".join(part.get("plain_text", "") for part in title_parts)
@@ -222,6 +235,28 @@ class NotionClient:
             # Creating a page in a database requires database_id parent type
             # and the title in the database's title property
             title_property = self._get_database_title_property(parent_page_id)
+
+            # Wiki databases have no properties - create page with just title property
+            if title_property is None:
+                logger.info("Creating page in wiki database (no property schema)")
+                resp = self.client.pages.create(
+                    parent={"type": "database_id", "database_id": parent_page_id},
+                    properties={
+                        "title": {
+                            "title": [
+                                {
+                                    "type": "text",
+                                    "text": {"content": title}
+                                }
+                            ]
+                        }
+                    },
+                    icon=None,
+                    cover=None,
+                )
+                new_id = resp["id"]
+                logger.info("Created page '%s' in wiki database with id %s", title, new_id)
+                return new_id
 
             # Try to create with the detected title property, fallback to common names if it fails
             title_properties_to_try = [title_property]
