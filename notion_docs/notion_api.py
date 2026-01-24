@@ -137,29 +137,36 @@ class NotionClient:
             try:
                 title_property = self._get_database_title_property(parent_page_id)
 
-                # Query all pages in the database (Notion doesn't support case-insensitive filtering)
-                # Note: databases.query might not exist in all versions, so we catch AttributeError
-                try:
-                    resp = self.client.databases.query(database_id=parent_page_id, page_size=100)
-                except AttributeError:
-                    logger.warning("Database query method not available, cannot search for existing pages in database %s", parent_page_id)
+                # Get the data_source_id from the database (new API 2025-09-03)
+                db = self.client.databases.retrieve(database_id=parent_page_id)
+                data_sources = db.get("data_sources", [])
+                if not data_sources:
+                    logger.warning("Database %s has no data_sources", parent_page_id)
                     return None
+                data_source_id = data_sources[0].get("id")
 
+                # Query pages by title filter
+                resp = self.client.data_sources.query(
+                    data_source_id=data_source_id,
+                    filter={"property": "title", "title": {"equals": segment}},
+                    page_size=100
+                )
                 pages = resp.get("results", [])
-                logger.debug("Found %d pages in database %s", len(pages), parent_page_id)
+                logger.debug("Found %d pages matching '%s' in database %s", len(pages), segment, parent_page_id)
 
-                # Manually filter pages by title
                 for page in pages:
                     props = page.get("properties", {})
+                    page_id = page.get("id")
 
-                    # For wiki databases with no schema, use "title" property
-                    prop_name_to_check = title_property if title_property else "title"
-                    title_prop = props.get(prop_name_to_check, {})
+                    # Find the title property (it may have any name, but type is "title")
+                    title = None
+                    for prop_data in props.values():
+                        if prop_data.get("type") == "title":
+                            title_parts = prop_data.get("title", [])
+                            title = "".join(part.get("plain_text", "") for part in title_parts)
+                            break
 
-                    if title_prop.get("type") == "title":
-                        title_parts = title_prop.get("title", [])
-                        title = "".join(part.get("plain_text", "") for part in title_parts)
-                        page_id = page.get("id")
+                    if title:
 
                         mode = self.titles_matching
 
