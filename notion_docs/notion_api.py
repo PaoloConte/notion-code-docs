@@ -330,7 +330,11 @@ class NotionClient:
     def get_metadata(self, page_id: str) -> Tuple[Optional[str], Optional[str]]:
         """Read metadata hashes from Notion page properties.
         Returns (text_hash, subtree_hash) or (None, None) if not present.
+        Database roots do not support page properties, so they return no metadata.
         """
+        if self._detect_parent_type(page_id) == "database":
+            logger.info("Skipping metadata read for database root %s", page_id)
+            return None, None
         try:
             page = self.client.pages.retrieve(page_id=page_id)
             props = page.get("properties", {}) or {}
@@ -367,8 +371,13 @@ class NotionClient:
             return None, None
 
     def set_metadata(self, page_id: str, text_hash: str, subtree_hash: str, ignore_errors: bool = False) -> None:
-        """Write metadata via Notion page properties only."""
+        """Write metadata via Notion page properties only.
+        Database roots do not support page properties, so writes are skipped.
+        """
         logger.info("Setting metadata on %s", page_id)
+        if self._detect_parent_type(page_id) == "database":
+            logger.info("Skipping metadata write for database root %s", page_id)
+            return
         try:
             self.client.pages.update(
                 page_id=page_id,

@@ -79,7 +79,7 @@ quote_color: gray
 inline_code_color: blue
 ```
 - `root` is the directory where the source code is located.
-- `root_page_id` is the ID of the root page in Notion.
+- `root_page_id` is the ID of the root page or wiki/database root in Notion.
 - (optional) `header` is the header to add to the top of each generated page
 - (optional) `include_file_in_header` set to `true` to include the list of source files in the header.
 - (optional) `titles_matching` is the title matching strategy (all are case-insensitive). Possible values are:
@@ -98,10 +98,11 @@ Plus set an environment variable `NOTION_API_KEY` with the API key of your Notio
 
 # Notion Setup
 - create a private Notion connection and get the API key
-- create a notion page and add the connection to it
-- get the page ID and set it in the config file
-- transform the page into a wiki
-- create properties `Subtree Hash` and `Text Hash`
+- create a Notion page or wiki/database root and add the connection to it
+- get that root ID and set it in the config file
+- plain Notion pages do not support arbitrary custom properties in the API
+- only database-backed pages support schema properties such as `Subtree Hash` and `Text Hash`
+- if you use a wiki/database root, the root itself still does not support page-property metadata; child pages can still sync normally
 
 
 # Usage
