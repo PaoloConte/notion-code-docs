@@ -33,6 +33,16 @@ def markdown_to_blocks(md: str, quote_color: str = "default", inline_code_color:
             "color": color,
         }
 
+    def is_valid_url(url: Optional[str]) -> bool:
+        """Check if a URL has a valid http/https scheme (required by Notion API)."""
+        if not url:
+            return False
+        try:
+            u = urlparse(url)
+            return u.scheme in ("http", "https")
+        except Exception:
+            return False
+
     def is_notion_url(url: Optional[str]) -> bool:
         if not url:
             return False
@@ -87,8 +97,10 @@ def markdown_to_blocks(md: str, quote_color: str = "default", inline_code_color:
                         return
                 # default: plain text (possibly linked)
                 text_obj: Dict[str, Any] = {"content": content_text}
-                if current_link:
+                if current_link and is_valid_url(current_link):
                     text_obj["link"] = {"url": current_link}
+                elif current_link:
+                    logger.error("Invalid URL for link (missing http/https scheme), skipping: %s", current_link)
                 segments.append({
                     "type": "text",
                     "text": text_obj,
@@ -117,8 +129,10 @@ def markdown_to_blocks(md: str, quote_color: str = "default", inline_code_color:
                         })
                         continue
                 text_obj: Dict[str, Any] = {"content": t.content}
-                if current_link:
+                if current_link and is_valid_url(current_link):
                     text_obj["link"] = {"url": current_link}
+                elif current_link:
+                    logger.error("Invalid URL for link (missing http/https scheme), skipping: %s", current_link)
                 segments.append({
                     "type": "text",
                     "text": text_obj,
