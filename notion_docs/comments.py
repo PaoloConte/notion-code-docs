@@ -162,8 +162,9 @@ def parse_breadcrumb_and_strip(body: str) -> Optional[Tuple[List[str], str, Dict
     """Parse a NOTION.* breadcrumb at the start of body and strip it.
 
     Returns a tuple (breadcrumb, remaining_text, options) if present, otherwise None.
-    Breadcrumb segments are split on '.' or '/' after the NOTION prefix and may
-    include spaces or symbols as part of each segment. The delimiters are '.' and '/'.
+    The separator is fixed by the first character after the NOTION prefix: either
+    '.' or '/'. Only that character is treated as a segment delimiter; the other
+    appears literally inside segments (e.g. "NOTION.Title (R/S)" keeps "(R/S)").
     Options can be specified in brackets: NOTION[option1,option2].page.path
     """
     # Extract options from brackets if present (e.g., NOTION[include_all].page)
@@ -204,8 +205,8 @@ def parse_breadcrumb_and_strip(body: str) -> Optional[Tuple[List[str], str, Dict
     if sep not in (".", "/"):
         sep = "."
     segments_part = token[len("NOTION")+1:]
-    # Split on both '.' and '/' and trim whitespace from each segment
-    segments = [p.strip() for p in re.split(r"[\./]", segments_part) if p.strip()] if segments_part else []
+    # Split only on the detected separator; the other character is a literal in segments
+    segments = [p.strip() for p in segments_part.split(sep) if p.strip()] if segments_part else []
     # Special case: Check if this is NOTION.* or NOTION/* with text after
     # If so, only keep "*" as the segment and move the rest to comment text
     if segments_part.strip() == "*" or (segments_part.startswith("* ") or segments_part.startswith("*\t")):

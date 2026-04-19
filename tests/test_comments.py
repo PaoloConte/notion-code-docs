@@ -108,10 +108,14 @@ def test_parse_breadcrumb_and_strip():
         ("NOTION.A. B .C\nBody", (["A", "B", "C"], "Body", {})),
         ("NOTION. A . B\nContent", (["A", "B"], "Content", {})),
         ("NOTION.A.\tB\t.C\nMore", (["A", "B", "C"], "More", {})),
+        # Once the separator is chosen, the other character is literal in segments
+        ("NOTION.Letture.Origine lettura (R/S)\nBody", (["Letture", "Origine lettura (R/S)"], "Body", {})),
+        ("NOTION/Letture/Origine lettura (R.S)\nBody", (["Letture", "Origine lettura (R.S)"], "Body", {})),
+        ("NOTION/A/B/C\nBody", (["A", "B", "C"], "Body", {})),
     ]
     for body, expected in cases:
         result = parse_breadcrumb_and_strip(body)
-        assert result == expected
+        assert result == expected, f"Failed for: {body}"
 
 
 def test_parse_breadcrumb_with_options():
@@ -131,6 +135,8 @@ def test_parse_breadcrumb_with_options():
         ("NOTION[opt1].* Inline comment", (["*"], "Inline comment", {"opt1": True})),
         # Options with trimmed breadcrumb parts
         ("NOTION[opt1]. A . B . C\nText", (["A", "B", "C"], "Text", {"opt1": True})),
+        # Non-separator character is literal inside segments
+        ("NOTION[opt1].A.Title (X/Y)\nText", (["A", "Title (X/Y)"], "Text", {"opt1": True})),
     ]
     for body, expected in cases:
         result = parse_breadcrumb_and_strip(body)
